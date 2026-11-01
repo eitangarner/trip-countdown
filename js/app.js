@@ -285,6 +285,7 @@ export class CountdownBoardApp {
       eventModalStatusPill: document.getElementById('event-modal-status-pill'),
       eventModalDatePill: document.getElementById('event-modal-date-pill'),
       eventModalTitle: document.getElementById('event-modal-title'),
+      eventModalTravelTag: document.getElementById('event-modal-travel-tag'),
       eventModalLocation: document.getElementById('event-modal-location'),
       eventCdDays: document.getElementById('event-cd-days'),
       eventCdHours: document.getElementById('event-cd-hours'),
@@ -489,6 +490,7 @@ export class CountdownBoardApp {
       this.dom.secondaryClock,
       this.dom.secondaryTzOffset,
       this.dom.eventModalTitle,
+      this.dom.eventModalTravelTag,
       this.dom.eventModalLocation,
       this.dom.eventModalSubtext,
       this.dom.eventModalDatePill
@@ -1397,6 +1399,7 @@ export class CountdownBoardApp {
     let emoji = '';
     let title = '';
     let datePillText = '';
+    let travelTagText = '';
     let locationText = '';
     let targetStartMs = 0;
     let targetEndMs = 0;
@@ -1420,7 +1423,8 @@ export class CountdownBoardApp {
         return `${c.flag} ${l.label || c.name}`;
       }).join(' • ') || `${startCountry.flag} ${startCountry.name}`;
 
-      locationText = `Reunion Chapter • ${countryNames}`;
+      travelTagText = 'Traveling Together';
+      locationText = countryNames;
       subtext = item.description || '';
     } else {
       emoji = item.emoji || '✨';
@@ -1443,6 +1447,15 @@ export class CountdownBoardApp {
     if (this.dom.eventModalTitle) this.dom.eventModalTitle.textContent = title;
     if (this.dom.eventModalDatePill) {
       this.dom.eventModalDatePill.replaceChildren(createPhotoDateElement(datePillText, { isCompact: true }));
+    }
+    if (this.dom.eventModalTravelTag) {
+      if (travelTagText) {
+        this.dom.eventModalTravelTag.textContent = travelTagText;
+        this.dom.eventModalTravelTag.hidden = false;
+      } else {
+        this.dom.eventModalTravelTag.textContent = '';
+        this.dom.eventModalTravelTag.hidden = true;
+      }
     }
     if (this.dom.eventModalLocation) this.dom.eventModalLocation.textContent = locationText;
     if (this.dom.eventModalSubtext) {

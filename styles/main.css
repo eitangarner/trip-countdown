@@ -2583,13 +2583,20 @@ main {
 .event-modal-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
+}
+
+.event-modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .event-modal-badge {
-  font-size: 2.2rem;
+  font-size: 1.55rem;
   line-height: 1;
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.08));
+  flex-shrink: 0;
 }
 
 .event-modal-content {
@@ -2630,6 +2637,32 @@ main {
   color: var(--ink-primary);
   letter-spacing: -0.02em;
   line-height: 1.25;
+}
+
+.event-modal-travel-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.event-modal-travel-tag {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-block: 2.5px;
+  padding-inline: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass-subtle);
+  border: 1px solid var(--surface-border);
+  color: var(--ink-secondary);
+}
+
+.event-modal-travel-tag[hidden] {
+  display: none !important;
 }
 
 .event-modal-location {

@@ -459,7 +459,6 @@
     hidden
   >
     <div class="event-modal-header">
-      <div class="event-modal-badge" id="event-modal-badge" aria-hidden="true">✨</div>
       <button type="button" class="sheet-close-btn" id="event-modal-close-btn" aria-label="Close popup">✕</button>
     </div>
 
@@ -469,8 +468,15 @@
         <span class="timeline-date-pill numeric-lock" id="event-modal-date-pill" dir="ltr"></span>
       </div>
 
-      <h2 class="event-modal-title" id="event-modal-title" dir="auto"></h2>
-      <p class="event-modal-location" id="event-modal-location"></p>
+      <div class="event-modal-title-row">
+        <h2 class="event-modal-title" id="event-modal-title" dir="auto"></h2>
+        <span class="event-modal-badge" id="event-modal-badge" aria-hidden="true">✨</span>
+      </div>
+
+      <div class="event-modal-travel-info" id="event-modal-travel-info">
+        <span class="event-modal-travel-tag" id="event-modal-travel-tag" hidden></span>
+        <p class="event-modal-location" id="event-modal-location"></p>
+      </div>
 
       <div class="countdown-grid numeric-lock" id="event-modal-countdown-grid" dir="ltr" role="timer" aria-live="polite">
         <div class="countdown-unit">
