@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f4f4f8" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Eitan & Shoval" />
+  <title>Eitan &amp; Shoval — Countdown &amp; Journey Board</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="stylesheet" href="./styles/main.css" />
+</head>
+<body>
+  <!-- 1. Full-Viewport Ambient Dispersion Stage (Apple Music Lighter Matte Glass) -->
+  <div class="ambient-stage" id="ambient-stage" aria-hidden="true">
+    <div class="ambient-blob ambient-blob-primary"></div>
+    <div class="ambient-blob ambient-blob-secondary"></div>
+    <img id="ambient-backdrop-img" class="ambient-photo-aura" alt="" hidden />
+  </div>
+
+  <!-- 2. Password Gate Overlay (AES-256-GCM Vault Unlock) -->
+  <div class="vault-lock-overlay" id="vault-lock-overlay" role="dialog" aria-modal="true" aria-labelledby="vault-title">
+    <div class="vault-card" id="vault-card">
+      <div class="vault-icon-badge" aria-hidden="true">🔒</div>
+      <h1 class="vault-title" id="vault-title">Eitan &amp; Shoval</h1>
+      <p class="vault-subtitle">Enter our shared password to unlock photos &amp; our live trip board</p>
+      <form class="vault-form" id="vault-unlock-form" autocomplete="off">
+        <input
+          type="password"
+          id="vault-password-input"
+          class="vault-password-input"
+          placeholder="Shared password…"
+          required
+          autocomplete="current-password"
+        />
+        <label class="vault-remember-pill">
+          <input type="checkbox" id="vault-remember-checkbox" checked />
+          <span>Remember this phone</span>
+        </label>
+        <div class="vault-error-msg" id="vault-error-msg" role="alert"></div>
+        <button type="submit" class="vault-unlock-btn" id="vault-unlock-btn">Unlock Board ✨</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. Main Board Container -->
+  <main class="board-container" id="board-container">
+    <!-- Time-Travel Preview Active Floating Banner -->
+    <div class="preview-banner" id="preview-banner" hidden>
+      <span class="preview-banner-text">
+        <span>⏱️ Previewing</span>
+        <span class="numeric-lock" id="preview-banner-date" dir="ltr"></span>
+      </span>
+      <button type="button" class="preview-reset-btn" id="preview-reset-btn">Reset to Live</button>
+    </div>
+
+    <!-- Section 1: Ambient Hero Section -->
+    <section class="hero-section" aria-label="Relationship & Reunion Countdown">
+      <!-- Live "Days Together" Counter Pill -->
+      <div class="days-together-pill" id="days-together-pill">
+        <span>💕</span>
+        <span class="numeric-lock" id="relationship-days-primary" dir="ltr">294 Days Together</span>
+        <span class="pill-divider">•</span>
+        <span class="pill-secondary numeric-lock" id="relationship-days-breakdown" dir="ltr">9 Months, 21 Days</span>
+      </div>
+
+      <!-- Swipeable 3D Photo Card Stack -->
+      <div class="photo-stack-wrapper" id="photo-stack-container"></div>
+
+      <!-- Primary State & Countdown Card -->
+      <div class="countdown-card" id="countdown-card">
+        <div class="phase-banner-pill" id="phase-banner-pill" dir="auto">Pre-Trip • Together at Home 🇮🇱</div>
+
+        <!-- Apart / Pre-Trip Live D:H:M:S Countdown View -->
+        <div id="countdown-apart-view" style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px;">
+          <div class="countdown-header">
+            <span class="countdown-target-label" id="countdown-target-label">Countdown to Next Reunion</span>
+            <h2 class="countdown-target-title" id="countdown-target-title" dir="auto">🌺 Together in Thailand</h2>
+            <span class="countdown-target-date numeric-lock" id="countdown-target-date" dir="ltr">31-12-2026</span>
+          </div>
+
+          <div class="countdown-grid numeric-lock" dir="ltr" role="timer" aria-live="polite">
+            <div class="countdown-unit">
+              <span class="countdown-value" id="cd-days">00</span>
+              <span class="countdown-label">Days</span>
+            </div>
+            <div class="countdown-unit">
+              <span class="countdown-value" id="cd-hours">00</span>
+              <span class="countdown-label">Hours</span>
+            </div>
+            <div class="countdown-unit">
+              <span class="countdown-value" id="cd-minutes">00</span>
+              <span class="countdown-label">Mins</span>
+            </div>
+            <div class="countdown-unit">
+              <span class="countdown-value" id="cd-seconds">00</span>
+              <span class="countdown-label">Secs</span>
+            </div>
+          </div>
+
+          <!-- Separation Progress Bar (shown when Apart) -->
+          <div class="separation-progress-container" id="separation-progress-container" hidden>
+            <div class="separation-progress-meta">
+              <span id="separation-progress-label">Separation progress</span>
+              <span class="numeric-lock" id="separation-progress-pct" dir="ltr">0%</span>
+            </div>
+            <div class="separation-progress-bar">
+              <div class="separation-progress-fill" id="separation-progress-fill" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Together Celebration View (shown when Reunion is active) -->
+        <div class="together-celebration-card" id="countdown-together-view" hidden>
+          <span class="active-leg-badge" id="together-leg-badge">🇹🇭 Thailand • Day 1 of 11</span>
+          <h2 class="together-headline" id="together-headline" dir="auto">🌺 Together in Thailand!</h2>
+          <p class="together-subtext" id="together-subtext" dir="auto"></p>
+          <div class="separation-progress-container">
+            <div class="separation-progress-meta">
+              <span id="together-progress-label">Chapter progress</span>
+              <span class="numeric-lock" id="together-progress-day" dir="ltr">Day 1 / 11</span>
+            </div>
+            <div class="separation-progress-bar">
+              <div class="separation-progress-fill" id="together-progress-fill" style="width: 10%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Secondary Sub-Milestone Banner (next sooner milestone e.g. Birthday / Departure / Anniversary) -->
+        <div class="sub-milestone-banner" id="sub-milestone-banner" dir="auto" hidden></div>
+      </div>
+    </section>
+
+    <!-- Section 2: "Where We Are Now" Dual Status & Time-Zone Bridge -->
+    <section class="status-section" aria-label="Where We Are Now">
+      <div class="section-header-row">
+        <h3 class="section-title">Where We Are Now</h3>
+        <span class="tz-code-label" id="auto-sync-indicator" hidden>✨ Synced to Reunion</span>
+      </div>
+
+      <div class="dual-status-grid">
+        <!-- Shoval Status Card -->
+        <article class="person-status-card" data-person="shoval" id="status-card-shoval">
+          <div class="person-card-header">
+            <span class="person-name-tag">
+              <span class="person-dot"></span>
+              <span>Shoval</span>
+            </span>
+          </div>
+          <div class="person-country-row">
+            <span class="person-flag" id="shoval-flag">🇮🇱</span>
+            <span class="person-country" id="shoval-country">Israel</span>
+          </div>
+          <div class="city-note" id="shoval-city-note" dir="auto"></div>
+          <div class="person-clock-row">
+            <span class="local-clock numeric-lock" id="shoval-clock" dir="ltr">12:00</span>
+            <span class="tz-code-label numeric-lock" id="shoval-tz-offset" dir="ltr">UTC+2</span>
+          </div>
+        </article>
+
+        <!-- Overlapping Time-Zone Bridge Pill -->
+        <div class="tz-bridge-pill numeric-lock" id="tz-bridge-pill" dir="ltr">✨ Same time zone!</div>
+
+        <!-- Eitan Status Card -->
+        <article class="person-status-card" data-person="eitan" id="status-card-eitan">
+          <div class="person-card-header">
+            <span class="person-name-tag">
+              <span class="person-dot"></span>
+              <span>Eitan</span>
+            </span>
+          </div>
+          <div class="person-country-row">
+            <span class="person-flag" id="eitan-flag">🇮🇱</span>
+            <span class="person-country" id="eitan-country">Israel</span>
+          </div>
+          <div class="city-note" id="eitan-city-note" dir="auto"></div>
+          <div class="person-clock-row">
+            <span class="local-clock numeric-lock" id="eitan-clock" dir="ltr">12:00</span>
+            <span class="tz-code-label numeric-lock" id="eitan-tz-offset" dir="ltr">UTC+2</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Section 3: Split-and-Merge Chronological Timeline -->
+    <section class="timeline-section" aria-label="Journey Timeline">
+      <div class="section-header-row">
+        <h3 class="section-title">Journey &amp; Reunion Timeline</h3>
+      </div>
+
+      <div class="timeline-stats-bar">
+        <div class="trip-stats-pill" id="trip-stats-pill">🌏 53 Trip Days Together Planned</div>
+        <button
+          type="button"
+          class="past-chapters-toggle"
+          id="past-chapters-toggle"
+          aria-expanded="false"
+          hidden
+        >
+          Completed Chapters (0) ▾
+        </button>
+      </div>
+
+      <!-- Collapsible Past Chapters Drawer -->
+      <div class="past-chapters-drawer" id="past-chapters-drawer" hidden></div>
+
+      <!-- Active & Upcoming Split-and-Merge Track -->
+      <div class="timeline-track-container" id="timeline-upcoming-track"></div>
+    </section>
+  </main>
+
+  <!-- 4. Floating Mobile Edit Mode Action Button -->
+  <button type="button" class="fab-edit-btn" id="fab-edit-btn" aria-label="Open Update & Preview Panel">
+    <span>✏️</span>
+    <span>Update</span>
+  </button>
+
+  <!-- 5. Mobile Edit & Time-Travel Bottom Sheet -->
+  <div class="edit-sheet-backdrop" id="edit-sheet-backdrop"></div>
+  <aside
+    class="edit-bottom-sheet"
+    id="edit-bottom-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="edit-sheet-title"
+  >
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-header">
+      <h2 class="sheet-title" id="edit-sheet-title">Update Board &amp; Preview</h2>
+      <button type="button" class="sheet-close-btn" id="edit-sheet-close-btn" aria-label="Close panel">✕</button>
+    </div>
+
+    <!-- A. Time-Travel Preview Slider -->
+    <div class="edit-section">
+      <div class="edit-section-title">
+        <span>⏱️ Time-Travel Preview</span>
+        <span class="numeric-lock" id="slider-date-readout" dir="ltr">Live Now</span>
+      </div>
+      <input
+        type="range"
+        id="time-travel-slider"
+        class="time-travel-slider"
+        min="1761868800000"
+        max="1780272000000"
+        step="3600000"
+      />
+      <div class="preset-chips-row" id="preset-chips-row"></div>
+    </div>
+
+    <!-- B. Quick Status Update (Shoval & Eitan Country + City/Vibe Note) -->
+    <form class="edit-section" id="status-update-form">
+      <div class="edit-section-title">
+        <span>📍 Quick Status Update</span>
+        <span class="sync-status-pill" id="sync-status-pill" data-sync-state="synced">Ready</span>
+      </div>
+
+      <div class="status-edit-grid">
+        <!-- Shoval Controls -->
+        <div class="form-group">
+          <label class="form-label" for="edit-shoval-country">Shoval's Current Country</label>
+          <select class="form-select" id="edit-shoval-country"></select>
+          <label class="form-label" for="edit-shoval-note">Shoval's City / Vibe Note (Optional)</label>
+          <input
+            type="text"
+            class="form-input"
+            id="edit-shoval-note"
+            dir="auto"
+            placeholder="e.g. Bariloche 🏔️ or ברילוצ׳ה 🏔️"
+            maxlength="60"
+          />
+        </div>
+
+        <!-- Eitan Controls -->
+        <div class="form-group">
+          <label class="form-label" for="edit-eitan-country">Eitan's Current Country</label>
+          <select class="form-select" id="edit-eitan-country"></select>
+          <label class="form-label" for="edit-eitan-note">Eitan's City / Vibe Note (Optional)</label>
+          <input
+            type="text"
+            class="form-input"
+            id="edit-eitan-note"
+            dir="auto"
+            placeholder="e.g. Koh Tao 🤿 or קו טאו 🤿"
+            maxlength="60"
+          />
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button type="submit" class="btn-primary" style="flex: 2;">Save Status Update 💾</button>
+        <button
+          type="button"
+          id="clear-status-overrides-btn"
+          class="preset-chip"
+          style="flex: 1; padding-block: 12px;"
+        >
+          Reset to Auto Schedule
+        </button>
+      </div>
+    </form>
+
+    <!-- C. Add Custom Milestone -->
+    <form class="edit-section" id="add-milestone-form">
+      <div class="edit-section-title">
+        <span>✨ Add Milestone or Flight</span>
+      </div>
+      <div class="status-edit-grid">
+        <div class="form-group">
+          <label class="form-label" for="ms-title-input">Title</label>
+          <input
+            type="text"
+            class="form-input"
+            id="ms-title-input"
+            dir="auto"
+            placeholder="e.g. Flight to Cusco 🦙"
+            required
+            maxlength="80"
+          />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="ms-date-input">Date</label>
+          <input type="date" class="form-input numeric-lock" id="ms-date-input" dir="ltr" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="ms-person-select">Who</label>
+          <select class="form-select" id="ms-person-select">
+            <option value="both">💕 Together (Both)</option>
+            <option value="shoval">🌸 Shoval</option>
+            <option value="eitan">🌊 Eitan</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="ms-country-select">Country</label>
+          <select class="form-select" id="ms-country-select"></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="ms-details-input">Details / Notes (Optional)</label>
+        <input
+          type="text"
+          class="form-input"
+          id="ms-details-input"
+          dir="auto"
+          placeholder="Optional note…"
+          maxlength="120"
+        />
+      </div>
+      <button type="submit" class="btn-primary">Add to Timeline ➕</button>
+    </form>
+
+    <!-- D. Device Lock / Reset -->
+    <div style="display: flex; justify-content: center; padding-block-start: 4px;">
+      <button type="button" class="preset-chip" id="lock-device-btn">🔒 Lock Vault on This Phone</button>
+    </div>
+  </aside>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

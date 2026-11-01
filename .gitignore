@@ -1,0 +1,8 @@
+images/
+raw-photos/
+.env
+token.txt
+*token*
+.DS_Store
+Thumbs.db
+node_modules/
