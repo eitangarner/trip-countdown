@@ -3,7 +3,7 @@
 ## 1. Aesthetic Direction: Apple Music Lighter Matte Glass
 
 Instead of heavy dark-mode glass, the board uses a **luminous, airy Apple Music matte-glass aesthetic**:
-- A warm alabaster/pearl base canvas (`#f5f5f7`) infused with soft, high-saturation radial color dispersion extracted from the active photo (`filter: blur(75px) saturate(1.75)`).
+- A warm alabaster/pearl base canvas (`#f4f4f8`) infused with soft, high-saturation 4-color radial color dispersion (`filter: blur(80px) saturate(1.75)`) and a full-viewport liquid photo aura (`filter: blur(90px) saturate(1.85) brightness(1.12)`).
 - Extracted photo colors are clamped to a **luminous pastel range** (`HSL lightness 68%–84%`, `saturation 65%–90%`) so the ambient wash feels vibrant and sunlit without overpowering dark-ink typography (`#14151a`).
 - Cards sit on **frosted white matte glass** (`rgba(255, 255, 255, 0.62)`) with `backdrop-filter: blur(28px) saturate(190%)`, specular inner-top highlights (`inset 0 1px 0 rgba(255, 255, 255, 0.85)`), and whisper-thin borders (`1px solid rgba(255, 255, 255, 0.72)`).
 
@@ -18,6 +18,8 @@ All components must reference these tokens in `styles/main.css`—never hardcode
   /* Dynamic Photo-Extracted Palette (updated smoothly over 800ms by photo-stack.js) */
   --ambient-primary: #f6b8d0;    /* Soft rose default */
   --ambient-secondary: #b8d8f8;  /* Sky pastel default */
+  --ambient-tertiary: #fbd3a7;   /* Warm amber pastel default */
+  --ambient-quaternary: #d5bdf8; /* Soft lavender pastel default */
   --ambient-accent: #e86f9a;     /* Richer interactive accent (buttons, active rail, progress fill) */
 
   /* Base Canvas & Matte Glass Surfaces */
@@ -37,9 +39,9 @@ All components must reference these tokens in `styles/main.css`—never hardcode
   --ink-muted: #7b8194;
   --ink-on-accent: #ffffff;
 
-  /* Track & Person Accents */
-  --track-shoval: #e05d87;       /* Warm rose-coral rail */
-  --track-eitan: #3b82f6;        /* Crisp ocean-blue rail */
+  /* Track & Partner Accents */
+  --track-primary: #e05d87;      /* Warm rose-coral rail */
+  --track-secondary: #3b82f6;    /* Crisp ocean-blue rail */
   --track-together: #d946ef;     /* Merged reunion gradient anchor */
 
   /* Layout & Geometry */
@@ -59,7 +61,7 @@ All components must reference these tokens in `styles/main.css`—never hardcode
 
 1. **Ambient Background Layer (`.ambient-stage`)**:
    - Fixed full-viewport backdrop (`position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden`).
-   - Renders two overlapping radial blobs (`--ambient-primary` and `--ambient-secondary`) plus a blurred projection of the active photo (`filter: blur(75px) saturate(1.75); opacity: 0.48`) masked with a soft radial vignette into `--bg-canvas`.
+   - Renders a 4-color radial dispersion mesh (`--ambient-primary`, `--ambient-secondary`, `--ambient-tertiary`, `--ambient-quaternary`) layered with the full-viewport blurred photo aura (`.ambient-photo-aura`) into `--bg-canvas`.
 2. **3D Photo Card Stack (`.photo-stack`)**:
    - Aspect ratio `4 / 4.6`, max width `300px` on mobile (`340px` on tablet/desktop), centered in the Hero.
    - **Active Card (`[data-depth="0"]`)**: `transform: translate3d(0, 0, 0) scale(1) rotate(0deg); z-index: 3; opacity: 1;`
@@ -75,7 +77,7 @@ All components must reference these tokens in `styles/main.css`—never hardcode
   - `--font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Heebo", "Inter", system-ui, sans-serif;`
   - Include native Hebrew fallback metrics so mixed English/Hebrew lines share balanced cap-height and line-height (`1.45`).
 - **Numeric Stability**:
-  - Every live counter (`D : H : M : S`), relationship day pill, local clock (`HH:MM`), and date badge (`DD.MM.YYYY`) **must** apply:
+  - Every live counter (`D : H : M : S`), relationship day pill, local clock (`HH:MM`), and date badge (`DD-MM-YYYY`) **must** apply:
     ```css
     .numeric-lock {
       font-variant-numeric: tabular-nums;
@@ -85,7 +87,7 @@ All components must reference these tokens in `styles/main.css`—never hardcode
     }
     ```
 - **RTL-Safe Layout & Text**:
-  - User-facing text fields (`cityNote`, milestone titles, custom notes) must carry `dir="auto"` in HTML so `"ברילוצ׳ה 🏔️"` right-aligns naturally while `"Koh Tao 🤿"` left-aligns.
+  - User-facing text fields (`cityNote`, milestone titles, custom notes) must carry `dir="auto"` in HTML so RTL and LTR strings align naturally.
   - All spacing, borders, and badges must use CSS logical properties (`padding-inline`, `margin-inline-start`, `border-inline-start`, `inset-inline`).
 
 ---
@@ -93,27 +95,27 @@ All components must reference these tokens in `styles/main.css`—never hardcode
 ## 5. Component Specifications
 
 ### A. Hero Section
-- **Top Pill**: Frosted pill showing `💕 X Days Together • Y Months, Z Days` since `10.01.2026`.
-- **Photo Deck**: Interactive 3-card stack with subtle caption badge at the bottom-start corner and an auto-rotate play/pause toggle pill at the bottom-end corner.
+- **Top Pill**: Frosted pill showing `💕 X Days Together • Y Months, Z Days` since the decrypted origin date.
+- **Photo Deck**: Interactive 3-card stack with date badge at the bottom-start corner and shuffle control at the bottom-end corner.
 - **Primary Countdown Matte Card**:
-  - When **Pre-Trip**: Banner `"🏡 Together at Home 🇮🇱"` + countdown to Shoval's departure (`06.12.26`) & Reunion #1 in Thailand (`31.12.26`).
-  - When **Apart**: Large tabular `Days : Hours : Mins : Secs` countdown to the next Reunion, a smooth matte progress bar showing `% of separation completed`, and a secondary glass sub-banner showing the **next sooner milestone** (e.g., `"🎂 Next up in 3 days: Shoval's Hebrew Birthday (15.12)"`).
-  - When **Together (Reunion Active)**: Celebratory gradient pill `"🌺 Together Now in Thailand! (Day 3 of 11)"` or `"🌸 Together in Japan 🇯🇵 (Leg 3 of 3 • Day 22 of 42)"`, plus countdown to the next shared leg or milestone.
+  - When **Pre-Trip**: Banner `"Pre-Trip • Together at Home"` + countdown to Reunion #1.
+  - When **Apart**: Large tabular `Days : Hours : Mins : Secs` countdown to the next Reunion, a smooth matte progress bar showing `% of separation completed`, and a secondary glass sub-banner showing the **next sooner milestone**.
+  - When **Together (Reunion Active)**: Celebratory gradient pill showing the active leg and day of the chapter, plus countdown to the next shared leg or milestone.
 
 ### B. "Where We Are Now" Dual Status & Time-Zone Bridge
 - Two side-by-side matte glass cards (`grid-template-columns: 1fr auto 1fr` on mobile with a centered overlapping Time-Zone Bridge pill).
-- Left/Start card: **Shoval** (`--track-shoval` top dot, flag emoji, country name, `dir="auto"` city/vibe note, live `HH:MM` local clock).
-- Center Bridge Pill: `🌐 10h apart` or `✨ Same time zone!`.
-- Right/End card: **Eitan** (`--track-eitan` top dot, flag emoji, country name, `dir="auto"` city/vibe note, live `HH:MM` local clock).
+- Left/Start card: **Partner A** (`--track-primary` top dot, flag emoji, country name, `dir="auto"` city/vibe note, live `HH:MM` local clock).
+- Center Bridge Pill: `🌐 Xh apart` or `✨ Same time zone!`.
+- Right/End card: **Partner B** (`--track-secondary` top dot, flag emoji, country name, `dir="auto"` city/vibe note, live `HH:MM` local clock).
 
 ### C. Split-and-Merge Chronological Timeline
-- **Header Bar**: Trip Stats summary pill (`53 Trip Days Together Planned`) + collapsible `"Completed Chapters (X)"` drawer button so past events stay tucked away by default.
-- **Split Rails (Apart Phases)**: Two parallel vertical tracks (`--track-shoval` and `--track-eitan`) with anchored milestone cards on the left/right or spanning across both tracks for shared relationship anniversaries.
-- **Merged Reunion Card (Together Phases)**: Dynamic SVG cubic-bezier connectors smoothly bend the two rails inward into a single wide frosted reunion card with a subtle iridescent border, displaying the internal leg stepper for multi-country reunions (`Singapore 🇸🇬 10.03–13.03` → `South Korea 🇰🇷 13.03–20.03` → `Japan 🇯🇵 20.03–21.04`).
+- **Header Bar**: Trip Stats summary pill (`X Trip Days Together Planned`) + collapsible `"Completed Chapters (X)"` drawer button so past events stay tucked away by default.
+- **Split Rails (Apart Phases)**: Two parallel vertical tracks (`--track-primary` and `--track-secondary`) with anchored milestone cards on the left/right or spanning across both tracks for shared milestones.
+- **Merged Reunion Card (Together Phases)**: Dynamic SVG cubic-bezier connectors smoothly bend the two rails inward into a single wide frosted reunion card with a subtle iridescent border, displaying the internal leg stepper for multi-country reunions.
 
 ### D. Mobile Edit Bottom Sheet & Time-Travel Bar
-- Floating `✏️ Update` pill button anchored at `bottom: calc(16px + env(safe-area-inset-bottom))`, `inset-inline-end: 16px`.
+- Floating `✏️ Update` pill button anchored at `bottom: calc(16px + env(safe-area-inset-bottom))`, `inset-inline-end: 16px` (hidden while locked).
 - Opens a matte-glass bottom sheet (`max-height: 88dvh`, scrollable) with:
-  1. **Time-Travel Preview Slider**: Scrubs between `2026-10-31` and `2027-06-01` with quick-jump preset chips (`Today`, `Apart Dec 12`, `Thailand NYE`, `Apart Feb 15`, `Singapore Mar 11`, `Japan Mar 25`) and a persistent top floating `"⏱️ Previewing [Date] — Reset to Live"` pill whenever active.
-  2. **Quick Status Update**: Country selector dropdowns (40+ countries) & `dir="auto"` city/vibe inputs for Shoval and Eitan.
-  3. **Milestone & Reunion Editor**: Add/edit milestones or update post-Japan reunion plans, syncing to GitHub `live-state.json` (with automatic `localStorage` offline queue).
+  1. **Time-Travel Preview Slider**: Scrubs across the decrypted `timeTravelRange` with quick-jump preset chips and a persistent top floating `"⏱️ Previewing [Date] — Reset to Live"` pill whenever active.
+  2. **Quick Status Update**: Country selector dropdowns (249 ISO countries) & `dir="auto"` city/vibe inputs.
+  3. **Milestone & Reunion Editor**: Add custom milestones, syncing AES-256-GCM encrypted state to GitHub `live-state.json` (with automatic offline queue).

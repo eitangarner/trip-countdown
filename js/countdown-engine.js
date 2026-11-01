@@ -1,4 +1,4 @@
-import { COUNTRY_CATALOG, TRIP_CONFIG, getCountryInfo } from './config.js';
+import { COUNTRY_CATALOG, getCountryInfo } from './config.js';
 
 const MS_PER_SECOND = 1000;
 const MS_PER_MINUTE = 60 * MS_PER_SECOND;
@@ -7,6 +7,9 @@ const MS_PER_DAY = 24 * MS_PER_HOUR;
 
 /** @type {Map<string, Intl.DateTimeFormat>} */
 const FORMATTER_CACHE = new Map();
+
+/** @type {Map<string, number>} */
+const DAY_BOUNDARY_CACHE = new Map();
 
 /**
  * Returns a cached Intl.DateTimeFormat instance for the given IANA timezone.
@@ -116,7 +119,6 @@ export function getZonedDateParts(epochMs, timeZone) {
 
 /**
  * Computes the exact UTC offset in minutes at epochMs for the given IANA timeZone.
- * E.g. America/Argentina/Buenos_Aires -> -180, Asia/Bangkok -> +420.
  * @param {number} epochMs
  * @param {string} timeZone
  * @returns {number}
@@ -149,23 +151,37 @@ function getZonedWallClockEpochMs(dateStr, timeZone, hour, minute, second, ms) {
 }
 
 /**
- * Converts "YYYY-MM-DD" to the exact epoch milliseconds of 00:00:00.000 in timeZone.
+ * Converts "YYYY-MM-DD" to the exact epoch milliseconds of 00:00:00.000 in timeZone (memoized).
  * @param {string} dateStr
  * @param {string} timeZone
  * @returns {number}
  */
 export function getStartOfDayInTimeZoneMs(dateStr, timeZone) {
-  return getZonedWallClockEpochMs(dateStr, timeZone, 0, 0, 0, 0);
+  const cacheKey = `S|${dateStr}|${timeZone}`;
+  const cached = DAY_BOUNDARY_CACHE.get(cacheKey);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const computed = getZonedWallClockEpochMs(dateStr, timeZone, 0, 0, 0, 0);
+  DAY_BOUNDARY_CACHE.set(cacheKey, computed);
+  return computed;
 }
 
 /**
- * Converts "YYYY-MM-DD" to the exact epoch milliseconds of 23:59:59.999 in timeZone.
+ * Converts "YYYY-MM-DD" to the exact epoch milliseconds of 23:59:59.999 in timeZone (memoized).
  * @param {string} dateStr
  * @param {string} timeZone
  * @returns {number}
  */
 export function getEndOfDayInTimeZoneMs(dateStr, timeZone) {
-  return getZonedWallClockEpochMs(dateStr, timeZone, 23, 59, 59, 999);
+  const cacheKey = `E|${dateStr}|${timeZone}`;
+  const cached = DAY_BOUNDARY_CACHE.get(cacheKey);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const computed = getZonedWallClockEpochMs(dateStr, timeZone, 23, 59, 59, 999);
+  DAY_BOUNDARY_CACHE.set(cacheKey, computed);
+  return computed;
 }
 
 /**
@@ -196,13 +212,12 @@ export function formatShortDisplayDate(dateStr) {
  * @returns {import('./config.js').CountryInfo}
  */
 function resolveCountry(countryCode) {
-  const code = (countryCode || 'IL').toUpperCase();
+  const code = (countryCode || 'UTC').toUpperCase();
   return COUNTRY_CATALOG[code] ?? getCountryInfo(code);
 }
 
 /**
  * Resolves the month offset relative to originYear and originMonth.
- * Accepts a number of months (e.g. 10), a "YYYY-MM" string, or a "YYYY-MM-DD" string.
  * @param {string|number|undefined} bound
  * @param {number} originYear
  * @param {number} originMonth
@@ -248,30 +263,34 @@ function resolveAnniversaryCountryCode(dateStr, reunions, homeCountryCode) {
 
 /**
  * Generates automatic monthly anniversary MilestoneEvent items on the Nth day of each month
- * based on relationshipOriginDate (e.g. "2026-01-10").
- * Skips dates that already have an explicit anniversary milestone (such as ms-one-year-anniversary on 2027-01-10).
+ * based on originDateStr. Skips dates that already have an explicit anniversary milestone.
  *
- * @param {string} [originDateStr=TRIP_CONFIG.relationshipOriginDate]
- * @param {string|number} [startYearMonth='2026-11']
- * @param {string|number} [endYearMonth='2028-01']
- * @param {import('./config.js').MilestoneEvent[]} [existingMilestones=TRIP_CONFIG.milestones]
- * @param {import('./config.js').ReunionChapter[]} [reunions=TRIP_CONFIG.reunions]
+ * @param {string} originDateStr
+ * @param {string|number} [startYearMonth=10]
+ * @param {string|number} [endYearMonth=24]
+ * @param {import('./config.js').MilestoneEvent[]} [existingMilestones=[]]
+ * @param {import('./config.js').ReunionChapter[]} [reunions=[]]
+ * @param {string} [homeCountryCode='UTC']
  * @returns {import('./config.js').MilestoneEvent[]}
  */
 export function generateMonthlyAnniversaries(
-  originDateStr = TRIP_CONFIG.relationshipOriginDate,
-  startYearMonth = '2026-11',
-  endYearMonth = '2028-01',
-  existingMilestones = TRIP_CONFIG.milestones,
-  reunions = TRIP_CONFIG.reunions
+  originDateStr,
+  startYearMonth = 10,
+  endYearMonth = 24,
+  existingMilestones = [],
+  reunions = [],
+  homeCountryCode = 'UTC'
 ) {
+  if (!originDateStr) {
+    return [];
+  }
   const { year: originYear, month: originMonth, day: originDay } = parseIsoDateParts(originDateStr);
   const startOffset = Math.max(1, resolveMonthOffset(startYearMonth, originYear, originMonth, 10));
   const endOffset = Math.max(startOffset, resolveMonthOffset(endYearMonth, originYear, originMonth, 24));
 
   const existingAnniversaryDates = new Set(
     (existingMilestones || [])
-      .filter((ms) => ms.category === 'anniversary' || ms.id === 'ms-one-year-anniversary')
+      .filter((ms) => ms.category === 'anniversary')
       .map((ms) => ms.date)
   );
 
@@ -303,7 +322,7 @@ export function generateMonthlyAnniversaries(
       title,
       details: `Monthly milestone (${monthCount} months since ${formatDisplayDate(originDateStr)})`,
       person: 'both',
-      countryCode: resolveAnniversaryCountryCode(dateStr, reunions || [], TRIP_CONFIG.homeCountryCode),
+      countryCode: resolveAnniversaryCountryCode(dateStr, reunions || [], homeCountryCode),
       autoGenerated: true
     });
   }
@@ -385,8 +404,6 @@ export function decomposeRemainingMs(remainingMs) {
 
 /**
  * Computes the planned duration in days for a reunion leg.
- * Single-leg reunions treat startDate..endDate as inclusive calendar days (e.g. Dec 31..Jan 10 = 11 days).
- * Multi-leg reunions treat leg transition dates as seamless handoffs (e.g. 10..13 = 3d, 13..20 = 7d, 20..21 = 32d -> 42d).
  * @param {import('./config.js').ReunionLeg} leg
  * @param {import('./config.js').ReunionChapter} reunion
  * @returns {number}
@@ -410,7 +427,6 @@ export function getReunionDurationDays(reunion) {
 
 /**
  * Computes the exact epoch millisecond start and end boundaries for a ReunionChapter and each of its legs.
- * Consecutive legs in a multi-leg reunion hand off at 00:00:00.000 in the incoming leg's timezone with zero gap.
  * @param {import('./config.js').ReunionChapter} reunion
  */
 function resolveReunionWindows(reunion) {
@@ -449,27 +465,70 @@ function resolveReunionWindows(reunion) {
 }
 
 /**
+ * Resolves the two partner keys and departure dates dynamically from `config`.
+ * @param {import('./config.js').TripConfig} config
+ * @returns {{
+ *   firstPartnerKey: string,
+ *   secondPartnerKey: string,
+ *   primaryDepartureDate: string,
+ *   secondaryDepartureDate: string
+ * }}
+ */
+export function resolvePartnerConfigMeta(config) {
+  const keys = Object.keys(config.coupleNames || {});
+  const firstPartnerKey = keys[0] || 'partnerA';
+  const secondPartnerKey = keys[1] || 'partnerB';
+
+  const primaryDepartureDate =
+    /** @type {any} */ (config)[`${firstPartnerKey}DepartureDate`] ||
+    config.primaryDepartureDate ||
+    config.relationshipOriginDate;
+
+  const secondaryDepartureDate =
+    /** @type {any} */ (config)[`${secondPartnerKey}DepartureDate`] ||
+    config.secondaryDepartureDate ||
+    primaryDepartureDate;
+
+  return {
+    firstPartnerKey,
+    secondPartnerKey,
+    primaryDepartureDate,
+    secondaryDepartureDate
+  };
+}
+
+/**
  * Evaluates the complete board state deterministically at `nowMs`.
  * Never invokes Date.now() internally.
  *
- * @param {typeof TRIP_CONFIG} [config=TRIP_CONFIG]
+ * @param {import('./config.js').TripConfig} config
  * @param {import('./config.js').LiveStatePayload | null} [liveState=null]
  * @param {number} nowMs
  * @returns {import('./config.js').EvaluatedBoardState}
  */
-export function evaluateBoardState(config = TRIP_CONFIG, liveState = null, nowMs) {
+export function evaluateBoardState(config, liveState = null, nowMs) {
+  if (!config || typeof config !== 'object') {
+    throw new TypeError('evaluateBoardState requires a valid decrypted TripConfig object');
+  }
   if (typeof nowMs !== 'number' || Number.isNaN(nowMs)) {
     throw new TypeError('evaluateBoardState requires an explicit numeric nowMs timestamp');
   }
 
+  const {
+    firstPartnerKey,
+    secondPartnerKey,
+    primaryDepartureDate,
+    secondaryDepartureDate
+  } = resolvePartnerConfigMeta(config);
+
   const homeCountry = resolveCountry(config.homeCountryCode);
   const homeTz = homeCountry.timeZone;
 
-  const reunions = liveState?.customReunions?.length ? liveState.customReunions : config.reunions;
+  const reunions = liveState?.customReunions?.length ? liveState.customReunions : (config.reunions || []);
   const reunionWindows = reunions.map(resolveReunionWindows);
 
-  const shovalDepartureStartMs = getStartOfDayInTimeZoneMs(config.shovalDepartureDate, homeTz);
-  const eitanDepartureStartMs = getStartOfDayInTimeZoneMs(config.eitanDepartureDate, homeTz);
+  const primaryDepartureStartMs = getStartOfDayInTimeZoneMs(primaryDepartureDate, homeTz);
+  const secondaryDepartureStartMs = getStartOfDayInTimeZoneMs(secondaryDepartureDate, homeTz);
 
   // 1. Determine Phase & Active Reunion
   /** @type {'PRE_TRIP'|'APART'|'TOGETHER'} */
@@ -521,11 +580,11 @@ export function evaluateBoardState(config = TRIP_CONFIG, liveState = null, nowMs
     }
   }
 
-  if (phase !== 'TOGETHER' && nowMs < shovalDepartureStartMs) {
+  if (phase !== 'TOGETHER' && nowMs < primaryDepartureStartMs) {
     phase = 'PRE_TRIP';
   }
 
-  // 2. Relationship Duration (since 2026-01-10 in origin timezone)
+  // 2. Relationship Duration (in origin timezone)
   const currentOriginDateStr = getZonedDateParts(nowMs, homeTz).dateStr;
   const relationshipDuration = computeRelationshipDuration(
     config.relationshipOriginDate,
@@ -536,10 +595,11 @@ export function evaluateBoardState(config = TRIP_CONFIG, liveState = null, nowMs
   const baseMilestones = [...(config.milestones || []), ...(liveState?.customMilestones || [])];
   const monthlyAnniversaries = generateMonthlyAnniversaries(
     config.relationshipOriginDate,
-    '2026-11',
-    '2028-01',
+    10,
+    24,
     baseMilestones,
-    reunions
+    reunions,
+    config.homeCountryCode
   );
   const allMilestones = [...baseMilestones, ...monthlyAnniversaries].sort((a, b) =>
     a.date.localeCompare(b.date)
@@ -551,13 +611,18 @@ export function evaluateBoardState(config = TRIP_CONFIG, liveState = null, nowMs
   /** @type {import('./config.js').EvaluatedBoardState['primaryCountdown']} */
   let primaryCountdown = null;
 
-  const departureParts = decomposeRemainingMs(shovalDepartureStartMs - nowMs);
+  const departureMilestone =
+    baseMilestones.find((ms) => ms.category === 'departure' && ms.date === primaryDepartureDate) ||
+    baseMilestones.find((ms) => ms.category === 'departure') ||
+    null;
+
+  const departureParts = decomposeRemainingMs(primaryDepartureStartMs - nowMs);
   const departureCountdown = {
-    targetId: 'ms-shoval-depart',
-    targetTitle: 'Shoval Departs for Argentina',
-    targetEmoji: '✈️',
-    targetDate: config.shovalDepartureDate,
-    targetEpochMs: shovalDepartureStartMs,
+    targetId: departureMilestone?.id || 'ms-primary-depart',
+    targetTitle: departureMilestone?.title || 'Trip Departure',
+    targetEmoji: departureMilestone?.emoji || '✈️',
+    targetDate: primaryDepartureDate,
+    targetEpochMs: primaryDepartureStartMs,
     ...departureParts
   };
 
@@ -579,9 +644,9 @@ export function evaluateBoardState(config = TRIP_CONFIG, liveState = null, nowMs
         targetEpochMs: nextReunionWindow.startMs,
         ...remaining,
         separationProgressPct,
-        separationStartDate: config.shovalDepartureDate,
+        separationStartDate: primaryDepartureDate,
         separationTotalDays: diffCalendarDays(
-          config.shovalDepartureDate,
+          primaryDepartureDate,
           nextReunionWindow.reunion.startDate
         ),
         departureCountdown
@@ -618,10 +683,10 @@ export function evaluateBoardState(config = TRIP_CONFIG, liveState = null, nowMs
 
       const separationStartMs = lastCompletedReunion
         ? lastCompletedReunion.endMs + 1
-        : shovalDepartureStartMs;
+        : primaryDepartureStartMs;
       const separationStartDate = lastCompletedReunion
         ? lastCompletedReunion.reunion.endDate
-        : config.shovalDepartureDate;
+        : primaryDepartureDate;
       const separationTotalDays = diffCalendarDays(
         separationStartDate,
         nextReunionWindow.reunion.startDate
@@ -681,11 +746,23 @@ export function evaluateBoardState(config = TRIP_CONFIG, liveState = null, nowMs
   }
 
   // 6. Dual Status & Timezone Bridge
-  const resolvePersonStatus = (/** @type {'shoval'|'eitan'} */ person) => {
-    const override = liveState?.statusOverrides?.[person] ?? null;
+  const resolvePersonStatus = (
+    /** @type {string} */ personKey,
+    /** @type {'primary'|'secondary'} */ slot
+  ) => {
+    const override =
+      liveState?.statusOverrides?.[personKey] ??
+      liveState?.statusOverrides?.[slot] ??
+      null;
     let countryCode = config.homeCountryCode;
     let cityNote = '';
     let isAutoSyncedToReunion = false;
+
+    const soloLocs = config.defaultSoloLocations || {};
+    const getPhaseDefault = (phaseKey) => {
+      const phaseObj = soloLocs[phaseKey] || {};
+      return phaseObj[personKey] || phaseObj[slot] || { countryCode: config.homeCountryCode, cityNote: '' };
+    };
 
     if (phase === 'TOGETHER' && activeLegWindow) {
       const overrideMs = override?.updatedAt ? Date.parse(override.updatedAt) : NaN;
@@ -703,7 +780,7 @@ export function evaluateBoardState(config = TRIP_CONFIG, liveState = null, nowMs
       cityNote = override.cityNote ?? '';
       isAutoSyncedToReunion = false;
     } else if (phase === 'PRE_TRIP') {
-      const def = config.defaultSoloLocations.preTrip[person];
+      const def = getPhaseDefault('preTrip');
       countryCode = def.countryCode;
       cityNote = def.cityNote ?? '';
     } else {
@@ -711,21 +788,21 @@ export function evaluateBoardState(config = TRIP_CONFIG, liveState = null, nowMs
       const firstReunion = reunionWindows[0] ?? null;
       const secondReunion = reunionWindows[1] ?? null;
       if (firstReunion && nowMs < firstReunion.startMs) {
-        if (person === 'eitan' && nowMs < eitanDepartureStartMs) {
-          const def = config.defaultSoloLocations.preTrip.eitan;
+        if (slot === 'secondary' && nowMs < secondaryDepartureStartMs) {
+          const def = getPhaseDefault('preTrip');
           countryCode = def.countryCode;
           cityNote = def.cityNote ?? '';
         } else {
-          const def = config.defaultSoloLocations.apartPhase1[person];
+          const def = getPhaseDefault('apartPhase1');
           countryCode = def.countryCode;
           cityNote = def.cityNote ?? '';
         }
       } else if (secondReunion && nowMs < secondReunion.startMs) {
-        const def = config.defaultSoloLocations.apartPhase2[person];
+        const def = getPhaseDefault('apartPhase2');
         countryCode = def.countryCode;
         cityNote = def.cityNote ?? '';
       } else {
-        const def = config.defaultSoloLocations.apartPhase3[person];
+        const def = getPhaseDefault('apartPhase3');
         countryCode = def.countryCode;
         cityNote = def.cityNote ?? '';
       }
@@ -736,8 +813,9 @@ export function evaluateBoardState(config = TRIP_CONFIG, liveState = null, nowMs
     const utcOffsetMinutes = getUtcOffsetMinutes(nowMs, countryInfo.timeZone);
 
     return {
-      person,
-      displayName: config.coupleNames[person],
+      person: personKey,
+      slot,
+      displayName: config.coupleNames?.[personKey] || personKey,
       countryCode: countryInfo.code,
       countryName: countryInfo.name,
       flag: countryInfo.flag,
@@ -749,9 +827,9 @@ export function evaluateBoardState(config = TRIP_CONFIG, liveState = null, nowMs
     };
   };
 
-  const shovalStatus = resolvePersonStatus('shoval');
-  const eitanStatus = resolvePersonStatus('eitan');
-  const rawHourDiff = Math.abs(shovalStatus.utcOffsetMinutes - eitanStatus.utcOffsetMinutes) / 60;
+  const primaryStatus = resolvePersonStatus(firstPartnerKey, 'primary');
+  const secondaryStatus = resolvePersonStatus(secondPartnerKey, 'secondary');
+  const rawHourDiff = Math.abs(primaryStatus.utcOffsetMinutes - secondaryStatus.utcOffsetMinutes) / 60;
   const hourDifference = Number.isInteger(rawHourDiff) ? rawHourDiff : Number(rawHourDiff.toFixed(1));
   const isSameTimeZone = hourDifference === 0;
   const bridgeLabel = isSameTimeZone ? 'Same time zone! 🎉' : `${hourDifference}h apart`;
@@ -823,8 +901,10 @@ export function evaluateBoardState(config = TRIP_CONFIG, liveState = null, nowMs
     soonerMilestone,
     soonerMilestoneDaysAway,
     dualStatus: {
-      shoval: shovalStatus,
-      eitan: eitanStatus,
+      [firstPartnerKey]: primaryStatus,
+      [secondPartnerKey]: secondaryStatus,
+      primary: primaryStatus,
+      secondary: secondaryStatus,
       hourDifference,
       isSameTimeZone,
       bridgeLabel

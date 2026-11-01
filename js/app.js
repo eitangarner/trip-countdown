@@ -1,11 +1,11 @@
 import {
-  COUNTRY_CATALOG,
+  ALL_ISO_3166_CODES,
   PINNED_COUNTRY_CODES,
-  TRIP_CONFIG,
   getCountryInfo
 } from './config.js';
 import {
   clearCachedVault,
+  getVaultCryptoKey,
   loadCachedVault,
   unlockAndCacheVault
 } from './crypto-vault.js';
@@ -13,11 +13,13 @@ import {
   evaluateBoardState,
   formatDisplayDate,
   formatShortDisplayDate,
-  getZonedDateParts
+  getZonedDateParts,
+  resolvePartnerConfigMeta
 } from './countdown-engine.js';
 import { PhotoStackController } from './photo-stack.js';
 import { TimelineRenderer } from './timeline-renderer.js';
 import {
+  clearLocalLiveState,
   loadLiveState,
   registerOfflineSyncListener,
   saveLiveState
@@ -41,15 +43,16 @@ function formatUtcOffsetLabel(offsetMinutes) {
  * Populates a <select> element with Pinned Trip Countries at the top and all 249 ISO countries alphabetically below.
  * @param {HTMLSelectElement | null} selectEl
  * @param {string} selectedCode
+ * @param {string[]} [pinnedCodes]
  */
-function populateCountrySelect(selectEl, selectedCode = 'IL') {
+function populateCountrySelect(selectEl, selectedCode = 'US', pinnedCodes = PINNED_COUNTRY_CODES) {
   if (!selectEl) return;
   selectEl.innerHTML = '';
 
   const pinnedGroup = document.createElement('optgroup');
-  pinnedGroup.label = '⭐ Trip & Popular Destinations';
-  for (const code of PINNED_COUNTRY_CODES) {
-    const info = COUNTRY_CATALOG[code];
+  pinnedGroup.label = '⭐ Pinned Destinations';
+  for (const code of pinnedCodes) {
+    const info = getCountryInfo(code);
     if (!info) continue;
     const opt = document.createElement('option');
     opt.value = info.code;
@@ -59,7 +62,9 @@ function populateCountrySelect(selectEl, selectedCode = 'IL') {
 
   const allGroup = document.createElement('optgroup');
   allGroup.label = '🌍 All 249 Countries (A–Z)';
-  const sortedAll = Object.values(COUNTRY_CATALOG).sort((a, b) => a.name.localeCompare(b.name));
+  const sortedAll = ALL_ISO_3166_CODES
+    .map((code) => getCountryInfo(code))
+    .sort((a, b) => a.name.localeCompare(b.name));
   for (const info of sortedAll) {
     const opt = document.createElement('option');
     opt.value = info.code;
@@ -72,16 +77,28 @@ function populateCountrySelect(selectEl, selectedCode = 'IL') {
   selectEl.value = selectedCode;
 }
 
-class CountdownBoardApp {
+export class CountdownBoardApp {
+  /** @type {string | null} */
+  #githubToken = null;
+
+  /** @type {CryptoKey | null} */
+  #vaultCryptoKey = null;
+
+  /** @type {import('./config.js').TripConfig | null} */
+  #tripConfig = null;
+
+  /** @type { ReturnType<typeof setInterval> | null } */
+  #tickIntervalId = null;
+
   constructor() {
-    /** @type {import('./config.js').VaultPayload | null} */
-    this.vaultPayload = null;
+    /** @type {{ owner: string, repo: string, branch: string, path: string } | null} */
+    this.githubRepo = null;
     /** @type {Object | null} */
     this.encryptedVaultJson = null;
     /** @type {import('./config.js').LiveStatePayload} */
     this.liveState = {
       schemaVersion: 1,
-      updatedAt: '2026-10-31T00:00:00.000Z',
+      updatedAt: '1970-01-01T00:00:00.000Z',
       statusOverrides: {},
       customMilestones: []
     };
@@ -93,11 +110,13 @@ class CountdownBoardApp {
      */
     this.previewEpochMs = null;
     this.lastTimelineSignature = '';
+    this.lastSoonerMilestoneSignature = '';
 
     this.cacheDomElements();
     this.photoStack = new PhotoStackController({
       container: this.dom.photoStackContainer,
-      ambientContainer: this.dom.ambientStage
+      ambientContainer: this.dom.ambientStage,
+      deferInitialRender: true
     });
     this.timelineRenderer = new TimelineRenderer({
       statsPillEl: this.dom.tripStatsPill,
@@ -112,12 +131,14 @@ class CountdownBoardApp {
       ambientStage: document.getElementById('ambient-stage'),
       vaultOverlay: document.getElementById('vault-lock-overlay'),
       vaultCard: document.getElementById('vault-card'),
+      vaultTitle: document.getElementById('vault-title'),
       vaultForm: document.getElementById('vault-unlock-form'),
       vaultPasswordInput: /** @type {HTMLInputElement | null} */ (document.getElementById('vault-password-input')),
       vaultRememberCheckbox: /** @type {HTMLInputElement | null} */ (document.getElementById('vault-remember-checkbox')),
       vaultErrorMsg: document.getElementById('vault-error-msg'),
       vaultUnlockBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('vault-unlock-btn')),
 
+      boardContainer: document.getElementById('board-container'),
       previewBanner: document.getElementById('preview-banner'),
       previewBannerDate: document.getElementById('preview-banner-date'),
       previewResetBtn: document.getElementById('preview-reset-btn'),
@@ -151,19 +172,21 @@ class CountdownBoardApp {
       subMilestoneBanner: document.getElementById('sub-milestone-banner'),
 
       autoSyncIndicator: document.getElementById('auto-sync-indicator'),
-      shovalFlag: document.getElementById('shoval-flag'),
-      shovalCountry: document.getElementById('shoval-country'),
-      shovalCityNote: document.getElementById('shoval-city-note'),
-      shovalClock: document.getElementById('shoval-clock'),
-      shovalTzOffset: document.getElementById('shoval-tz-offset'),
+      primaryNameLabel: document.getElementById('primary-name-label'),
+      primaryFlag: document.getElementById('primary-flag'),
+      primaryCountry: document.getElementById('primary-country'),
+      primaryCityNote: document.getElementById('primary-city-note'),
+      primaryClock: document.getElementById('primary-clock'),
+      primaryTzOffset: document.getElementById('primary-tz-offset'),
 
       tzBridgePill: document.getElementById('tz-bridge-pill'),
 
-      eitanFlag: document.getElementById('eitan-flag'),
-      eitanCountry: document.getElementById('eitan-country'),
-      eitanCityNote: document.getElementById('eitan-city-note'),
-      eitanClock: document.getElementById('eitan-clock'),
-      eitanTzOffset: document.getElementById('eitan-tz-offset'),
+      secondaryNameLabel: document.getElementById('secondary-name-label'),
+      secondaryFlag: document.getElementById('secondary-flag'),
+      secondaryCountry: document.getElementById('secondary-country'),
+      secondaryCityNote: document.getElementById('secondary-city-note'),
+      secondaryClock: document.getElementById('secondary-clock'),
+      secondaryTzOffset: document.getElementById('secondary-tz-offset'),
 
       tripStatsPill: document.getElementById('trip-stats-pill'),
       pastChaptersToggle: /** @type {HTMLButtonElement | null} */ (document.getElementById('past-chapters-toggle')),
@@ -181,10 +204,14 @@ class CountdownBoardApp {
 
       statusUpdateForm: document.getElementById('status-update-form'),
       syncStatusPill: document.getElementById('sync-status-pill'),
-      editShovalCountry: /** @type {HTMLSelectElement | null} */ (document.getElementById('edit-shoval-country')),
-      editShovalNote: /** @type {HTMLInputElement | null} */ (document.getElementById('edit-shoval-note')),
-      editEitanCountry: /** @type {HTMLSelectElement | null} */ (document.getElementById('edit-eitan-country')),
-      editEitanNote: /** @type {HTMLInputElement | null} */ (document.getElementById('edit-eitan-note')),
+      editPrimaryCountryLabel: document.getElementById('edit-primary-country-label'),
+      editPrimaryCountry: /** @type {HTMLSelectElement | null} */ (document.getElementById('edit-primary-country')),
+      editPrimaryNoteLabel: document.getElementById('edit-primary-note-label'),
+      editPrimaryNote: /** @type {HTMLInputElement | null} */ (document.getElementById('edit-primary-note')),
+      editSecondaryCountryLabel: document.getElementById('edit-secondary-country-label'),
+      editSecondaryCountry: /** @type {HTMLSelectElement | null} */ (document.getElementById('edit-secondary-country')),
+      editSecondaryNoteLabel: document.getElementById('edit-secondary-note-label'),
+      editSecondaryNote: /** @type {HTMLInputElement | null} */ (document.getElementById('edit-secondary-note')),
       clearStatusOverridesBtn: document.getElementById('clear-status-overrides-btn'),
 
       addMilestoneForm: document.getElementById('add-milestone-form'),
@@ -199,38 +226,22 @@ class CountdownBoardApp {
   }
 
   async init() {
-    populateCountrySelect(this.dom.editShovalCountry, 'IL');
-    populateCountrySelect(this.dom.editEitanCountry, 'IL');
-    populateCountrySelect(this.dom.msCountrySelect, 'TH');
-
-    this.renderTimeTravelPresets();
     this.bindEventListeners();
     this.registerServiceWorker();
 
-    // Render initial board state immediately so background & layout are live behind lock screen
-    this.tick(true);
-    setInterval(() => this.tick(false), 1000);
-
-    // Check if device already has a remembered decrypted vault
-    const cachedVault = loadCachedVault();
-    if (cachedVault) {
-      this.applyUnlockedVault(cachedVault);
+    // Halt all countdown ticks and DOM hydration until either IndexedDB cache restores or user unlocks
+    const cachedVault = await loadCachedVault();
+    if (cachedVault && cachedVault.tripConfig) {
+      await this.mountUnlockedVault(cachedVault);
     } else {
       await this.preloadEncryptedVaultJson();
     }
 
-    // Load live-state.json overrides
-    this.liveState = await loadLiveState(
-      this.vaultPayload?.githubRepo ?? null,
-      this.vaultPayload?.githubToken ?? null
-    );
-    this.syncEditFormWithState();
-    this.tick(true);
-
     registerOfflineSyncListener(
       () => ({
-        githubToken: this.vaultPayload?.githubToken ?? null,
-        repoConfig: this.vaultPayload?.githubRepo ?? null
+        githubToken: this.#githubToken,
+        repoConfig: this.githubRepo,
+        cryptoKey: this.#vaultCryptoKey
       }),
       (outcome) => {
         this.updateSyncBadge(outcome.syncedRemotely ? 'synced' : 'pending', outcome.message);
@@ -249,13 +260,192 @@ class CountdownBoardApp {
     }
   }
 
-  applyUnlockedVault(payload) {
-    this.vaultPayload = payload;
-    if (this.dom.vaultOverlay) {
-      this.dom.vaultOverlay.classList.add('is-unlocked');
+  /**
+   * Mounts the decrypted vault into volatile memory, hydrates the DOM skeleton,
+   * loads encrypted live-state overrides, and starts the 1Hz countdown loop.
+   * @param {import('./config.js').VaultPayload} payload
+   */
+  async mountUnlockedVault(payload) {
+    if (!payload || !payload.tripConfig) {
+      throw new Error('Decrypted vault is missing required tripConfig.');
     }
+
+    this.#tripConfig = payload.tripConfig;
+    this.#githubToken = payload.githubToken ?? null;
+    this.#vaultCryptoKey = getVaultCryptoKey(payload);
+    this.githubRepo = payload.githubRepo ?? null;
+
+    // Release raw encrypted envelope buffer from RAM once unlocked
+    this.encryptedVaultJson = null;
+
+    const { firstPartnerKey, secondPartnerKey } = resolvePartnerConfigMeta(this.#tripConfig);
+    const primaryName = this.#tripConfig.coupleNames?.[firstPartnerKey] || firstPartnerKey;
+    const secondaryName = this.#tripConfig.coupleNames?.[secondPartnerKey] || secondPartnerKey;
+
+    if (typeof document !== 'undefined') {
+      document.title = `${ secondaryName } & ${ primaryName } — Countdown & Journey Board`;
+    }
+
+    if (this.dom.primaryNameLabel) this.dom.primaryNameLabel.textContent = primaryName;
+    if (this.dom.secondaryNameLabel) this.dom.secondaryNameLabel.textContent = secondaryName;
+    if (this.dom.editPrimaryCountryLabel) {
+      this.dom.editPrimaryCountryLabel.textContent = `${primaryName}'s Current Country`;
+    }
+    if (this.dom.editPrimaryNoteLabel) {
+      this.dom.editPrimaryNoteLabel.textContent = `${primaryName}'s City / Vibe Note (Optional)`;
+    }
+    if (this.dom.editSecondaryCountryLabel) {
+      this.dom.editSecondaryCountryLabel.textContent = `${secondaryName}'s Current Country`;
+    }
+    if (this.dom.editSecondaryNoteLabel) {
+      this.dom.editSecondaryNoteLabel.textContent = `${secondaryName}'s City / Vibe Note (Optional)`;
+    }
+
+    if (this.dom.msPersonSelect) {
+      this.dom.msPersonSelect.innerHTML = '';
+      const bothOpt = document.createElement('option');
+      bothOpt.value = 'both';
+      bothOpt.textContent = '💕 Together (Both)';
+      const primaryOpt = document.createElement('option');
+      primaryOpt.value = firstPartnerKey;
+      primaryOpt.textContent = `🌸 ${primaryName}`;
+      const secondaryOpt = document.createElement('option');
+      secondaryOpt.value = secondPartnerKey;
+      secondaryOpt.textContent = `🌊 ${secondaryName}`;
+      this.dom.msPersonSelect.append(bothOpt, primaryOpt, secondaryOpt);
+    }
+
+    const pinnedCodes = Array.isArray(this.#tripConfig.pinnedCountryCodes) &&
+      this.#tripConfig.pinnedCountryCodes.length > 0
+      ? this.#tripConfig.pinnedCountryCodes
+      : PINNED_COUNTRY_CODES;
+    const homeCode = this.#tripConfig.homeCountryCode || 'US';
+
+    populateCountrySelect(this.dom.editPrimaryCountry, homeCode, pinnedCodes);
+    populateCountrySelect(this.dom.editSecondaryCountry, homeCode, pinnedCodes);
+    populateCountrySelect(this.dom.msCountrySelect, pinnedCodes[2] || homeCode, pinnedCodes);
+
+    if (this.dom.timeTravelSlider && this.#tripConfig.timeTravelRange) {
+      this.dom.timeTravelSlider.min = String(this.#tripConfig.timeTravelRange.minMs);
+      this.dom.timeTravelSlider.max = String(this.#tripConfig.timeTravelRange.maxMs);
+      this.dom.timeTravelSlider.step = String(this.#tripConfig.timeTravelRange.stepMs || 3600000);
+    }
+    this.renderTimeTravelPresets();
+
+    if (this.dom.boardContainer) this.dom.boardContainer.hidden = false;
+    if (this.dom.fabEditBtn) this.dom.fabEditBtn.hidden = false;
+    if (this.dom.editBottomSheet) this.dom.editBottomSheet.hidden = false;
+    this.dom.vaultOverlay?.classList.add('is-unlocked');
+
     if (Array.isArray(payload.photos) && payload.photos.length > 0) {
       this.photoStack.setPhotos(payload.photos);
+    }
+
+    this.liveState = await loadLiveState(
+      this.githubRepo,
+      this.#githubToken,
+      this.#vaultCryptoKey
+    );
+    this.syncEditFormWithState();
+    this.tick(true);
+    this.startTickLoop();
+  }
+
+  /**
+   * Locks the board, purges IndexedDB and localStorage caches, wipes volatile credentials,
+   * and empties all DOM nodes back to the unauthenticated skeleton.
+   */
+  async lockAndPurgeBoard() {
+    this.stopTickLoop();
+    this.#githubToken = null;
+    this.#vaultCryptoKey = null;
+    this.#tripConfig = null;
+    this.githubRepo = null;
+    this.previewEpochMs = null;
+    this.lastTimelineSignature = '';
+    this.lastSoonerMilestoneSignature = '';
+    this.liveState = {
+      schemaVersion: 1,
+      updatedAt: '1970-01-01T00:00:00.000Z',
+      statusOverrides: {},
+      customMilestones: []
+    };
+
+    await clearCachedVault();
+    clearLocalLiveState();
+
+    this.closeEditSheet();
+    this.photoStack.clear();
+    this.timelineRenderer.clear();
+
+    if (typeof document !== 'undefined') {
+      document.title = 'Trip Countdown';
+    }
+
+    const textElementsToClear = [
+      this.dom.relationshipDaysPrimary,
+      this.dom.relationshipDaysBreakdown,
+      this.dom.phaseBannerPill,
+      this.dom.countdownTargetLabel,
+      this.dom.countdownTargetTitle,
+      this.dom.countdownTargetDate,
+      this.dom.togetherLegBadge,
+      this.dom.togetherHeadline,
+      this.dom.togetherSubtext,
+      this.dom.togetherProgressDay,
+      this.dom.subMilestoneBanner,
+      this.dom.primaryNameLabel,
+      this.dom.primaryFlag,
+      this.dom.primaryCountry,
+      this.dom.primaryCityNote,
+      this.dom.primaryClock,
+      this.dom.primaryTzOffset,
+      this.dom.tzBridgePill,
+      this.dom.secondaryNameLabel,
+      this.dom.secondaryFlag,
+      this.dom.secondaryCountry,
+      this.dom.secondaryCityNote,
+      this.dom.secondaryClock,
+      this.dom.secondaryTzOffset
+    ];
+    for (const el of textElementsToClear) {
+      if (el) el.textContent = '';
+    }
+
+    if (this.dom.cdDays) this.dom.cdDays.textContent = '--';
+    if (this.dom.cdHours) this.dom.cdHours.textContent = '--';
+    if (this.dom.cdMinutes) this.dom.cdMinutes.textContent = '--';
+    if (this.dom.cdSeconds) this.dom.cdSeconds.textContent = '--';
+
+    if (this.dom.presetChipsRow) this.dom.presetChipsRow.innerHTML = '';
+    if (this.dom.editPrimaryCountry) this.dom.editPrimaryCountry.innerHTML = '';
+    if (this.dom.editSecondaryCountry) this.dom.editSecondaryCountry.innerHTML = '';
+    if (this.dom.msCountrySelect) this.dom.msCountrySelect.innerHTML = '';
+    if (this.dom.msPersonSelect) this.dom.msPersonSelect.innerHTML = '';
+
+    if (this.dom.boardContainer) this.dom.boardContainer.hidden = true;
+    if (this.dom.fabEditBtn) this.dom.fabEditBtn.hidden = true;
+    if (this.dom.editBottomSheet) this.dom.editBottomSheet.hidden = true;
+    if (this.dom.previewBanner) this.dom.previewBanner.hidden = true;
+    if (this.dom.subMilestoneBanner) this.dom.subMilestoneBanner.hidden = true;
+
+    if (this.dom.vaultPasswordInput) this.dom.vaultPasswordInput.value = '';
+    if (this.dom.vaultErrorMsg) this.dom.vaultErrorMsg.textContent = '';
+    this.dom.vaultOverlay?.classList.remove('is-unlocked');
+  }
+
+  startTickLoop() {
+    this.stopTickLoop();
+    this.#tickIntervalId = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      this.tick(false);
+    }, 1000);
+  }
+
+  stopTickLoop() {
+    if (this.#tickIntervalId !== null) {
+      clearInterval(this.#tickIntervalId);
+      this.#tickIntervalId = null;
     }
   }
 
@@ -280,15 +470,8 @@ class CountdownBoardApp {
         }
 
         const decrypted = await unlockAndCacheVault(this.encryptedVaultJson, password, remember);
-        this.applyUnlockedVault(decrypted);
-
         if (this.dom.vaultPasswordInput) this.dom.vaultPasswordInput.value = '';
-        this.liveState = await loadLiveState(
-          decrypted.githubRepo ?? null,
-          decrypted.githubToken ?? null
-        );
-        this.syncEditFormWithState();
-        this.tick(true);
+        await this.mountUnlockedVault(decrypted);
       } catch {
         if (this.dom.vaultErrorMsg) {
           this.dom.vaultErrorMsg.textContent = 'Incorrect password — please try again.';
@@ -319,23 +502,27 @@ class CountdownBoardApp {
     // 4. Quick Status Update Form
     this.dom.statusUpdateForm?.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (!this.#tripConfig) return;
+
+      const { firstPartnerKey, secondPartnerKey } = resolvePartnerConfigMeta(this.#tripConfig);
+      const homeCode = this.#tripConfig.homeCountryCode || 'US';
       const nowIso = new Date(this.getEffectiveNowMs()).toISOString();
-      const shovalCountry = this.dom.editShovalCountry?.value || 'IL';
-      const shovalNote = (this.dom.editShovalNote?.value || '').trim();
-      const eitanCountry = this.dom.editEitanCountry?.value || 'IL';
-      const eitanNote = (this.dom.editEitanNote?.value || '').trim();
+      const primaryCountry = this.dom.editPrimaryCountry?.value || homeCode;
+      const primaryNote = (this.dom.editPrimaryNote?.value || '').trim();
+      const secondaryCountry = this.dom.editSecondaryCountry?.value || homeCode;
+      const secondaryNote = (this.dom.editSecondaryNote?.value || '').trim();
 
       this.liveState = {
         ...this.liveState,
         statusOverrides: {
-          shoval: {
-            countryCode: shovalCountry,
-            cityNote: shovalNote,
+          [firstPartnerKey]: {
+            countryCode: primaryCountry,
+            cityNote: primaryNote,
             updatedAt: nowIso
           },
-          eitan: {
-            countryCode: eitanCountry,
-            cityNote: eitanNote,
+          [secondPartnerKey]: {
+            countryCode: secondaryCountry,
+            cityNote: secondaryNote,
             updatedAt: nowIso
           }
         }
@@ -345,14 +532,16 @@ class CountdownBoardApp {
       this.updateSyncBadge('pending', 'Saving…');
       const result = await saveLiveState(
         this.liveState,
-        this.vaultPayload?.githubToken ?? null,
-        this.vaultPayload?.githubRepo ?? null
+        this.#githubToken,
+        this.githubRepo,
+        this.#vaultCryptoKey
       );
       this.updateSyncBadge(result.syncedRemotely ? 'synced' : 'pending', result.message);
     });
 
     // 5. Clear Manual Status Overrides (Reset to Auto Schedule)
     this.dom.clearStatusOverridesBtn?.addEventListener('click', async () => {
+      if (!this.#tripConfig) return;
       this.liveState = {
         ...this.liveState,
         statusOverrides: {}
@@ -361,8 +550,9 @@ class CountdownBoardApp {
       this.syncEditFormWithState();
       const result = await saveLiveState(
         this.liveState,
-        this.vaultPayload?.githubToken ?? null,
-        this.vaultPayload?.githubRepo ?? null
+        this.#githubToken,
+        this.githubRepo,
+        this.#vaultCryptoKey
       );
       this.updateSyncBadge(result.syncedRemotely ? 'synced' : 'pending', 'Reset to automatic schedule');
     });
@@ -370,10 +560,12 @@ class CountdownBoardApp {
     // 6. Add Custom Milestone Form
     this.dom.addMilestoneForm?.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (!this.#tripConfig) return;
+
       const title = (this.dom.msTitleInput?.value || '').trim();
       const date = this.dom.msDateInput?.value || '';
-      const person = /** @type {'both'|'shoval'|'eitan'} */ (this.dom.msPersonSelect?.value || 'both');
-      const countryCode = this.dom.msCountrySelect?.value || 'TH';
+      const person = this.dom.msPersonSelect?.value || 'both';
+      const countryCode = this.dom.msCountrySelect?.value || this.#tripConfig.homeCountryCode || 'US';
       const details = (this.dom.msDetailsInput?.value || '').trim();
 
       if (!title || !date) return;
@@ -404,23 +596,30 @@ class CountdownBoardApp {
       this.tick(true);
       const result = await saveLiveState(
         this.liveState,
-        this.vaultPayload?.githubToken ?? null,
-        this.vaultPayload?.githubRepo ?? null
+        this.#githubToken,
+        this.githubRepo,
+        this.#vaultCryptoKey
       );
       this.updateSyncBadge(result.syncedRemotely ? 'synced' : 'pending', result.message);
     });
 
     // 7. Lock Device Button
     this.dom.lockDeviceBtn?.addEventListener('click', () => {
-      clearCachedVault();
-      this.vaultPayload = null;
-      this.closeEditSheet();
-      this.dom.vaultOverlay?.classList.remove('is-unlocked');
+      void this.lockAndPurgeBoard();
     });
+
+    // 8. Resume tick immediately when tab becomes visible
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && this.#tripConfig) {
+          this.tick(false);
+        }
+      });
+    }
   }
 
   renderTimeTravelPresets() {
-    if (!this.dom.presetChipsRow) return;
+    if (!this.dom.presetChipsRow || !this.#tripConfig) return;
     this.dom.presetChipsRow.innerHTML = '';
 
     const liveChip = document.createElement('button');
@@ -431,7 +630,11 @@ class CountdownBoardApp {
     liveChip.addEventListener('click', () => this.setPreviewTimestamp(null));
     this.dom.presetChipsRow.appendChild(liveChip);
 
-    for (const preset of TRIP_CONFIG.timeTravelPresets) {
+    const presets = Array.isArray(this.#tripConfig.timeTravelPresets)
+      ? this.#tripConfig.timeTravelPresets
+      : [];
+
+    for (const preset of presets) {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'preset-chip';
@@ -453,6 +656,7 @@ class CountdownBoardApp {
    * @param {string} [activePresetId]
    */
   setPreviewTimestamp(epochMs, activePresetId = '') {
+    if (!this.#tripConfig) return;
     this.previewEpochMs = epochMs;
 
     if (this.dom.presetChipsRow) {
@@ -468,7 +672,8 @@ class CountdownBoardApp {
       if (this.dom.previewBanner) this.dom.previewBanner.hidden = true;
       if (this.dom.sliderDateReadout) this.dom.sliderDateReadout.textContent = 'Live Now';
     } else {
-      const zoned = getZonedDateParts(epochMs, 'Asia/Jerusalem');
+      const homeTz = getCountryInfo(this.#tripConfig.homeCountryCode || 'UTC').timeZone;
+      const zoned = getZonedDateParts(epochMs, homeTz);
       const formatted = formatDisplayDate(zoned.dateStr);
       if (this.dom.previewBanner) this.dom.previewBanner.hidden = false;
       if (this.dom.previewBannerDate) this.dom.previewBannerDate.textContent = formatted;
@@ -485,6 +690,7 @@ class CountdownBoardApp {
   }
 
   openEditSheet() {
+    if (!this.#tripConfig) return;
     this.syncEditFormWithState();
     this.dom.editSheetBackdrop?.classList.add('is-open');
     this.dom.editBottomSheet?.classList.add('is-open');
@@ -496,18 +702,19 @@ class CountdownBoardApp {
   }
 
   syncEditFormWithState() {
-    const state = evaluateBoardState(TRIP_CONFIG, this.liveState, this.getEffectiveNowMs());
-    if (this.dom.editShovalCountry) {
-      this.dom.editShovalCountry.value = state.dualStatus.shoval.countryCode;
+    if (!this.#tripConfig) return;
+    const state = evaluateBoardState(this.#tripConfig, this.liveState, this.getEffectiveNowMs());
+    if (this.dom.editPrimaryCountry) {
+      this.dom.editPrimaryCountry.value = state.dualStatus.primary.countryCode;
     }
-    if (this.dom.editShovalNote) {
-      this.dom.editShovalNote.value = state.dualStatus.shoval.cityNote || '';
+    if (this.dom.editPrimaryNote) {
+      this.dom.editPrimaryNote.value = state.dualStatus.primary.cityNote || '';
     }
-    if (this.dom.editEitanCountry) {
-      this.dom.editEitanCountry.value = state.dualStatus.eitan.countryCode;
+    if (this.dom.editSecondaryCountry) {
+      this.dom.editSecondaryCountry.value = state.dualStatus.secondary.countryCode;
     }
-    if (this.dom.editEitanNote) {
-      this.dom.editEitanNote.value = state.dualStatus.eitan.cityNote || '';
+    if (this.dom.editSecondaryNote) {
+      this.dom.editSecondaryNote.value = state.dualStatus.secondary.cityNote || '';
     }
   }
 
@@ -519,11 +726,14 @@ class CountdownBoardApp {
 
   /**
    * Evaluates board state at current/preview timestamp and updates DOM.
+   * No-ops strictly if the vault is locked (`this.#tripConfig === null`).
    * @param {boolean} forceTimelineRender
    */
   tick(forceTimelineRender = false) {
+    if (!this.#tripConfig) return;
+
     const nowMs = this.getEffectiveNowMs();
-    const state = evaluateBoardState(TRIP_CONFIG, this.liveState, nowMs);
+    const state = evaluateBoardState(this.#tripConfig, this.liveState, nowMs);
 
     // 1. Relationship Duration Top Pill
     const rel = state.relationshipDuration;
@@ -606,45 +816,63 @@ class CountdownBoardApp {
       }
     }
 
-    // 4. Secondary Sooner Milestone Sub-Banner
+    // 4. Secondary Sooner Milestone Sub-Banner (diffed and built with safe textContent)
     if (this.dom.subMilestoneBanner) {
       if (state.soonerMilestone) {
         const ms = state.soonerMilestone;
-        const daysLabel = state.soonerMilestoneDaysAway === 0
-          ? 'Today!'
-          : state.soonerMilestoneDaysAway === 1
-            ? 'Tomorrow'
-            : `In ${state.soonerMilestoneDaysAway} days`;
-        this.dom.subMilestoneBanner.hidden = false;
-        this.dom.subMilestoneBanner.innerHTML = `
-          <span>${ms.emoji}</span>
-          <span>
-            <strong class="numeric-lock" dir="ltr">${daysLabel} (${formatShortDisplayDate(ms.date)})</strong>:
-            <span dir="auto">${ms.title}</span>
-          </span>
-        `;
+        const soonerSig = `${ms.id}:${state.soonerMilestoneDaysAway}:${ms.title}:${ms.date}`;
+        if (forceTimelineRender || soonerSig !== this.lastSoonerMilestoneSignature) {
+          this.lastSoonerMilestoneSignature = soonerSig;
+          const daysLabel = state.soonerMilestoneDaysAway === 0
+            ? 'Today!'
+            : state.soonerMilestoneDaysAway === 1
+              ? 'Tomorrow'
+              : `In ${state.soonerMilestoneDaysAway} days`;
+
+          this.dom.subMilestoneBanner.hidden = false;
+          this.dom.subMilestoneBanner.textContent = '';
+
+          const emojiSpan = document.createElement('span');
+          emojiSpan.textContent = ms.emoji;
+
+          const textWrapper = document.createElement('span');
+          const strongDate = document.createElement('strong');
+          strongDate.className = 'numeric-lock';
+          strongDate.setAttribute('dir', 'ltr');
+          strongDate.textContent = `${daysLabel} (${formatShortDisplayDate(ms.date)})`;
+
+          const titleSpan = document.createElement('span');
+          titleSpan.setAttribute('dir', 'auto');
+          titleSpan.textContent = ms.title;
+
+          textWrapper.append(strongDate, document.createTextNode(': '), titleSpan);
+          this.dom.subMilestoneBanner.append(emojiSpan, textWrapper);
+        }
       } else {
+        this.lastSoonerMilestoneSignature = 'none';
         this.dom.subMilestoneBanner.hidden = true;
       }
     }
 
     // 5. Dual Status & Time-Zone Bridge
-    const { shoval, eitan, isSameTimeZone, bridgeLabel } = state.dualStatus;
+    const { primary, secondary, isSameTimeZone, bridgeLabel } = state.dualStatus;
     if (this.dom.autoSyncIndicator) {
-      this.dom.autoSyncIndicator.hidden = !(shoval.isAutoSyncedToReunion && eitan.isAutoSyncedToReunion);
+      this.dom.autoSyncIndicator.hidden = !(primary.isAutoSyncedToReunion && secondary.isAutoSyncedToReunion);
     }
 
-    if (this.dom.shovalFlag) this.dom.shovalFlag.textContent = shoval.flag;
-    if (this.dom.shovalCountry) this.dom.shovalCountry.textContent = shoval.countryName;
-    if (this.dom.shovalCityNote) this.dom.shovalCityNote.textContent = shoval.cityNote || '';
-    if (this.dom.shovalClock) this.dom.shovalClock.textContent = shoval.localTimeFormatted;
-    if (this.dom.shovalTzOffset) this.dom.shovalTzOffset.textContent = formatUtcOffsetLabel(shoval.utcOffsetMinutes);
+    if (this.dom.primaryNameLabel) this.dom.primaryNameLabel.textContent = primary.displayName;
+    if (this.dom.primaryFlag) this.dom.primaryFlag.textContent = primary.flag;
+    if (this.dom.primaryCountry) this.dom.primaryCountry.textContent = primary.countryName;
+    if (this.dom.primaryCityNote) this.dom.primaryCityNote.textContent = primary.cityNote || '';
+    if (this.dom.primaryClock) this.dom.primaryClock.textContent = primary.localTimeFormatted;
+    if (this.dom.primaryTzOffset) this.dom.primaryTzOffset.textContent = formatUtcOffsetLabel(primary.utcOffsetMinutes);
 
-    if (this.dom.eitanFlag) this.dom.eitanFlag.textContent = eitan.flag;
-    if (this.dom.eitanCountry) this.dom.eitanCountry.textContent = eitan.countryName;
-    if (this.dom.eitanCityNote) this.dom.eitanCityNote.textContent = eitan.cityNote || '';
-    if (this.dom.eitanClock) this.dom.eitanClock.textContent = eitan.localTimeFormatted;
-    if (this.dom.eitanTzOffset) this.dom.eitanTzOffset.textContent = formatUtcOffsetLabel(eitan.utcOffsetMinutes);
+    if (this.dom.secondaryNameLabel) this.dom.secondaryNameLabel.textContent = secondary.displayName;
+    if (this.dom.secondaryFlag) this.dom.secondaryFlag.textContent = secondary.flag;
+    if (this.dom.secondaryCountry) this.dom.secondaryCountry.textContent = secondary.countryName;
+    if (this.dom.secondaryCityNote) this.dom.secondaryCityNote.textContent = secondary.cityNote || '';
+    if (this.dom.secondaryClock) this.dom.secondaryClock.textContent = secondary.localTimeFormatted;
+    if (this.dom.secondaryTzOffset) this.dom.secondaryTzOffset.textContent = formatUtcOffsetLabel(secondary.utcOffsetMinutes);
 
     if (this.dom.tzBridgePill) {
       this.dom.tzBridgePill.textContent = `🌐 ${bridgeLabel}`;
@@ -669,6 +897,6 @@ class CountdownBoardApp {
 if (typeof document !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
     const app = new CountdownBoardApp();
-    app.init();
+    void app.init();
   });
 }

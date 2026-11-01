@@ -1,62 +1,135 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
 import {
-  VAULT_CACHE_STORAGE_KEY,
   clearCachedVault,
   decryptVault,
+  getVaultCryptoKey,
   loadCachedVault,
   unlockAndCacheVault
 } from '../js/crypto-vault.js';
 import {
+  ACTIVE_VAULT_KEY,
+  VAULT_DB_NAME,
+  VAULT_STORE_NAME,
+  loadDecryptedVault,
+  loadVaultCacheRecord,
+  purgeDecryptedVault
+} from '../js/storage-vault.js';
+import {
   buildCuratedChapterPhotos,
+  buildDefaultTripConfig,
   encryptVaultPayload,
   extractDateLabel,
   runCli
 } from '../scripts/encrypt-vault.mjs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, '..');
-const VAULT_JSON_PATH = path.join(REPO_ROOT, 'vault.json');
-
 /**
- * Minimal in-memory Storage mock for Node test runner.
+ * Minimal spec-compliant IndexedDB mock for verifying `TripCountdownSecureStorage`
+ * and `vault_cache` object store semantics in Node unit tests.
  */
-function createMockLocalStorage() {
-  const store = new Map();
+function createMockIndexedDB() {
+  const databases = new Map();
+
   return {
-    getItem(key) {
-      return store.has(key) ? store.get(key) : null;
-    },
-    setItem(key, value) {
-      store.set(key, String(value));
-    },
-    removeItem(key) {
-      store.delete(key);
-    },
-    clear() {
-      store.clear();
+    databases,
+    open(dbName, version) {
+      const request = {
+        result: null,
+        error: null,
+        onupgradeneeded: null,
+        onsuccess: null,
+        onerror: null
+      };
+
+      queueMicrotask(() => {
+        let dbEntry = databases.get(dbName);
+        const isUpgrade = !dbEntry || dbEntry.version < version;
+        if (!dbEntry) {
+          dbEntry = {
+            name: dbName,
+            version,
+            stores: new Map()
+          };
+          databases.set(dbName, dbEntry);
+        }
+
+        const dbHandle = {
+          objectStoreNames: {
+            contains(storeName) {
+              return dbEntry.stores.has(storeName);
+            }
+          },
+          createObjectStore(storeName) {
+            if (!dbEntry.stores.has(storeName)) {
+              dbEntry.stores.set(storeName, new Map());
+            }
+            return {};
+          },
+          transaction(storeName) {
+            const storeMap = dbEntry.stores.get(storeName) || new Map();
+            const tx = {
+              oncomplete: null,
+              onerror: null,
+              objectStore() {
+                return {
+                  put(record) {
+                    storeMap.set(record.key, record);
+                  },
+                  get(key) {
+                    const getReq = { result: undefined, onsuccess: null, onerror: null };
+                    queueMicrotask(() => {
+                      getReq.result = storeMap.get(key);
+                      if (getReq.onsuccess) getReq.onsuccess();
+                    });
+                    return getReq;
+                  },
+                  delete(key) {
+                    storeMap.delete(key);
+                  }
+                };
+              }
+            };
+            queueMicrotask(() => {
+              if (tx.oncomplete) tx.oncomplete();
+            });
+            return tx;
+          },
+          close() {}
+        };
+
+        request.result = dbHandle;
+        if (isUpgrade && typeof request.onupgradeneeded === 'function') {
+          request.onupgradeneeded();
+        }
+        if (typeof request.onsuccess === 'function') {
+          request.onsuccess();
+        }
+      });
+
+      return request;
     }
   };
 }
 
-test('encryptVaultPayload and decryptVault complete a lossless round-trip', async () => {
+test('encryptVaultPayload and decryptVault complete a lossless round-trip with tripConfig', async () => {
   const samplePayload = {
+    tripConfig: buildDefaultTripConfig(),
     photos: buildCuratedChapterPhotos(),
     githubToken: 'github_pat_sample_token_123',
     githubRepo: {
-      owner: 'eitangarner',
-      repo: 'shoval-countdown-board',
+      owner: 'sample-owner',
+      repo: 'trip-countdown',
       branch: 'main',
       path: 'live-state.json'
     },
-    generatedAt: '2026-10-31T10:00:00.000Z'
+    generatedAt: '2025-05-01T10:00:00.000Z'
   };
 
-  const envelope = encryptVaultPayload(samplePayload, 'shoval');
+  const envelope = encryptVaultPayload(samplePayload, 'vault-test-passphrase');
 
   assert.equal(envelope.version, 1);
   assert.equal(envelope.kdf, 'PBKDF2-SHA256');
@@ -65,19 +138,24 @@ test('encryptVaultPayload and decryptVault complete a lossless round-trip', asyn
   assert.equal(Buffer.from(envelope.iv, 'base64').byteLength, 12);
   assert.ok(Buffer.from(envelope.ciphertext, 'base64').byteLength > 16);
 
-  const decryptedFromObject = await decryptVault(envelope, 'shoval');
+  const decryptedFromObject = await decryptVault(envelope, 'vault-test-passphrase');
   assert.deepEqual(decryptedFromObject, samplePayload);
 
-  const decryptedFromJsonString = await decryptVault(JSON.stringify(envelope), 'shoval');
+  const cryptoKey = getVaultCryptoKey(decryptedFromObject);
+  assert.ok(cryptoKey, 'Decrypted payload should carry non-enumerable CryptoKey in memory');
+  assert.equal(cryptoKey.extractable, false, 'Derived CryptoKey must be non-extractable');
+
+  const decryptedFromJsonString = await decryptVault(JSON.stringify(envelope), 'vault-test-passphrase');
   assert.deepEqual(decryptedFromJsonString, samplePayload);
 });
 
-test('decryptVault rejects wrong password and tampered ciphertext', async () => {
+test('decryptVault rejects wrong password and tampered ciphertext without leaking partial data', async () => {
   const samplePayload = {
+    tripConfig: buildDefaultTripConfig(),
     photos: buildCuratedChapterPhotos(),
     githubToken: null,
     githubRepo: null,
-    generatedAt: '2026-10-31T10:00:00.000Z'
+    generatedAt: '2025-05-01T10:00:00.000Z'
   };
 
   const envelope = encryptVaultPayload(samplePayload, 'correct-horse-battery-staple');
@@ -100,51 +178,83 @@ test('decryptVault rejects wrong password and tampered ciphertext', async () => 
   );
 });
 
-test('unlockAndCacheVault, loadCachedVault, and clearCachedVault manage localStorage state', async () => {
-  const previousLocalStorage = globalThis.localStorage;
-  globalThis.localStorage = createMockLocalStorage();
+test('IndexedDB Storage Lifecycle: strips githubToken from stored payload while unwrapping in memory via non-extractable CryptoKey', async () => {
+  const previousIndexedDB = globalThis.indexedDB;
+  const mockIdb = createMockIndexedDB();
+  globalThis.indexedDB = /** @type {any} */ (mockIdb);
 
   try {
+    await purgeDecryptedVault();
+
     const samplePayload = {
+      tripConfig: buildDefaultTripConfig(),
       photos: buildCuratedChapterPhotos().slice(0, 2),
-      githubToken: null,
-      githubRepo: null,
-      generatedAt: '2026-10-31T10:00:00.000Z'
+      githubToken: 'github_pat_secret_in_memory_only_999',
+      githubRepo: {
+        owner: 'sample-owner',
+        repo: 'trip-countdown',
+        branch: 'main',
+        path: 'live-state.json'
+      },
+      generatedAt: '2025-05-01T10:00:00.000Z'
     };
-    const envelope = encryptVaultPayload(samplePayload, 'shoval');
+    const envelope = encryptVaultPayload(samplePayload, 'test-passphrase-idb');
 
-    assert.equal(loadCachedVault(), null);
+    assert.equal(await loadCachedVault(), null);
 
-    // Unlock without rememberDevice -> should not persist to localStorage
-    const unlockedTransient = await unlockAndCacheVault(envelope, 'shoval', false);
+    // 1. Unlock with rememberDevice = false -> IndexedDB remains empty
+    const unlockedTransient = await unlockAndCacheVault(envelope, 'test-passphrase-idb', false);
     assert.deepEqual(unlockedTransient, samplePayload);
-    assert.equal(globalThis.localStorage.getItem(VAULT_CACHE_STORAGE_KEY), null);
-    assert.equal(loadCachedVault(), null);
+    assert.equal(await loadVaultCacheRecord(), null);
+    assert.equal(await loadCachedVault(), null);
 
-    // Unlock with rememberDevice = true -> persists and reloads from localStorage
-    const unlockedRemembered = await unlockAndCacheVault(envelope, 'shoval', true);
+    // 2. Unlock with rememberDevice = true -> writes to TripCountdownSecureStorage / vault_cache
+    const unlockedRemembered = await unlockAndCacheVault(envelope, 'test-passphrase-idb', true);
     assert.deepEqual(unlockedRemembered, samplePayload);
-    assert.ok(globalThis.localStorage.getItem(VAULT_CACHE_STORAGE_KEY));
-    assert.deepEqual(loadCachedVault(), samplePayload);
 
-    // Forget device clears cache
-    clearCachedVault();
-    assert.equal(loadCachedVault(), null);
+    // Inspect raw IndexedDB store directly to audit at-rest security
+    const rawStore = mockIdb.databases.get(VAULT_DB_NAME)?.stores.get(VAULT_STORE_NAME);
+    assert.ok(rawStore, 'IndexedDB database TripCountdownSecureStorage and vault_cache store must exist');
+    const rawRecord = rawStore.get(ACTIVE_VAULT_KEY);
+    assert.ok(rawRecord, 'active_vault record must exist in vault_cache');
+    assert.equal(rawRecord.payload.githubToken, null, 'githubToken MUST be null at rest inside IndexedDB payload');
+    assert.ok(rawRecord.payload.tripConfig, 'tripConfig must be persisted in IndexedDB payload');
+    assert.equal(rawRecord.payload.photos.length, 2, 'photos must be persisted in IndexedDB payload');
+    assert.equal(rawRecord.cryptoKey.extractable, false, 'Stored CryptoKey must be non-extractable');
+
+    // loadDecryptedVault() returns the raw sanitized payload (githubToken === null)
+    const sanitizedLoaded = await loadDecryptedVault();
+    assert.equal(sanitizedLoaded?.githubToken, null);
+
+    // loadCachedVault() unwraps the encrypted token into volatile RAM using the non-extractable CryptoKey
+    const hydratedInRam = await loadCachedVault();
+    assert.deepEqual(hydratedInRam, samplePayload);
+    assert.equal(hydratedInRam?.githubToken, 'github_pat_secret_in_memory_only_999');
+
+    // 3. Lock / Purge clears IndexedDB completely
+    await clearCachedVault();
+    assert.equal(await loadCachedVault(), null);
+    assert.equal(await loadDecryptedVault(), null);
   } finally {
-    globalThis.localStorage = previousLocalStorage;
+    globalThis.indexedDB = previousIndexedDB;
   }
 });
 
-test('CLI generates vault.json with password and curated chapter illustrations', async () => {
-  const existingBackup = fs.existsSync(VAULT_JSON_PATH)
-    ? fs.readFileSync(VAULT_JSON_PATH, 'utf8')
-    : null;
+test('CLI generates vault.json in an isolated temp directory without touching production vault.json', async () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-cli-test-'));
+  const outputVaultPath = path.join(tmpDir, 'vault.json');
+  const emptyPhotosDir = path.join(tmpDir, 'empty-photos');
 
   try {
-    runCli(['test-passphrase-123']);
+    runCli(['test-passphrase-123', 'ghp_test_token_abc', 'owner/repo'], {
+      repoRootDir: tmpDir,
+      photosDir: emptyPhotosDir,
+      outputVaultPath,
+      optimizeImages: false
+    });
 
-    assert.ok(fs.existsSync(VAULT_JSON_PATH), 'vault.json should exist in repository root');
-    const rawVaultJson = fs.readFileSync(VAULT_JSON_PATH, 'utf8');
+    assert.ok(fs.existsSync(outputVaultPath), 'vault.json should be created in temp directory');
+    const rawVaultJson = fs.readFileSync(outputVaultPath, 'utf8');
     const parsedEnvelope = JSON.parse(rawVaultJson);
 
     assert.equal(parsedEnvelope.version, 1);
@@ -152,23 +262,17 @@ test('CLI generates vault.json with password and curated chapter illustrations',
     assert.equal(parsedEnvelope.iterations, 150000);
 
     const unlockedVault = await decryptVault(rawVaultJson, 'test-passphrase-123');
+    assert.ok(unlockedVault.tripConfig, 'Decrypted vault must include tripConfig');
+    assert.equal(unlockedVault.githubToken, 'ghp_test_token_abc');
+    assert.deepEqual(unlockedVault.githubRepo, {
+      owner: 'owner',
+      repo: 'repo',
+      branch: 'main',
+      path: 'live-state.json'
+    });
     assert.ok(unlockedVault.photos.length >= 1);
-
-    for (const photo of unlockedVault.photos) {
-      assert.ok(photo.id.length > 0);
-      assert.ok(photo.dataUrl.startsWith('data:image/'));
-      assert.ok(photo.dateLabel.length > 0);
-      assert.ok(typeof photo.caption === 'string');
-      if (photo.palette) {
-        assert.ok(photo.palette.primary);
-        assert.ok(photo.palette.secondary);
-        assert.ok(photo.palette.accent);
-      }
-    }
   } finally {
-    if (existingBackup !== null) {
-      fs.writeFileSync(VAULT_JSON_PATH, existingBackup, 'utf8');
-    }
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
 

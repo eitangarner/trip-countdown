@@ -10,6 +10,8 @@ const SALT_BYTE_LENGTH = 16;
 const IV_BYTE_LENGTH = 12;
 const KEY_BYTE_LENGTH = 32;
 const AUTH_TAG_BYTE_LENGTH = 16;
+const MAX_IMAGE_DIMENSION_PX = 960;
+const JPEG_QUALITY_PCT = 68;
 
 const MIME_BY_EXTENSION = {
   '.jpg': 'image/jpeg',
@@ -21,6 +23,8 @@ const MIME_BY_EXTENSION = {
   '.heic': 'image/heic',
   '.heif': 'image/heif'
 };
+
+const RASTER_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.heic', '.heif']);
 
 const FALLBACK_PALETTES = [
   { primary: '#f6b8d0', secondary: '#b8d8f8', accent: '#e86f9a' },
@@ -40,15 +44,16 @@ function svgToDataUrl(svgMarkup) {
 }
 
 /**
- * Returns the 4 curated romantic chapter illustrations when raw-photos/ is absent or empty.
+ * Returns 4 generic abstract chapter illustrations when raw-photos/ and images/ are absent.
+ * Contains zero personal dates or location identifiers.
  * @returns {import('../js/config.js').VaultPhoto[]}
  */
 export function buildCuratedChapterPhotos() {
   return [
     {
-      id: 'chapter-1-home-israel',
+      id: 'chapter-1-origin',
       caption: '',
-      dateLabel: '10-01-2026',
+      dateLabel: 'Chapter 01',
       palette: {
         primary: '#f6b8d0',
         secondary: '#fde2b8',
@@ -77,24 +82,13 @@ export function buildCuratedChapterPhotos() {
           <circle cx="400" cy="390" r="95" fill="#fff7eb" fill-opacity="0.9"/>
           <path d="M0 575 Q200 555 400 575 T800 570 L800 920 L0 920 Z" fill="url(#sea1)" fill-opacity="0.78"/>
           <path d="M0 640 Q240 615 480 645 T800 635 L800 920 L0 920 Z" fill="#4f8bc9" fill-opacity="0.65"/>
-          <rect x="330" y="592" width="140" height="6" rx="3" fill="#fff6ea" fill-opacity="0.8"/>
-          <rect x="352" y="608" width="96" height="5" rx="2.5" fill="#fff6ea" fill-opacity="0.65"/>
-          <rect x="372" y="624" width="56" height="4" rx="2" fill="#fff6ea" fill-opacity="0.45"/>
-          <path d="M0 715 Q260 675 530 735 L800 710 L800 920 L0 920 Z" fill="#f7d9c4"/>
-          <g fill="#2b2d42" fill-opacity="0.82">
-            <circle cx="378" cy="656" r="18"/>
-            <path d="M356 718 C356 684 400 684 400 718 Z"/>
-            <circle cx="422" cy="652" r="19"/>
-            <path d="M398 718 C398 680 446 680 446 718 Z"/>
-          </g>
-          <path d="M400 605 C392 593 374 595 374 609 C374 622 400 634 400 641 C400 634 426 622 426 609 C426 595 408 593 400 605 Z" fill="#e85d88"/>
         </svg>
       `)
     },
     {
-      id: 'chapter-2-apart-horizons',
+      id: 'chapter-2-horizons',
       caption: '',
-      dateLabel: '06-12-2026',
+      dateLabel: 'Chapter 02',
       palette: {
         primary: '#b8dff8',
         secondary: '#fbd5b8',
@@ -117,20 +111,14 @@ export function buildCuratedChapterPhotos() {
           <circle cx="155" cy="220" r="56" fill="#ffffff" fill-opacity="0.88"/>
           <circle cx="645" cy="220" r="64" fill="#ffb38a" fill-opacity="0.82"/>
           <path d="M0 640 L125 430 L235 565 L320 395 L400 545 L400 920 L0 920 Z" fill="#6488b4"/>
-          <path d="M125 430 L165 485 L120 495 L88 490 Z" fill="#ffffff" fill-opacity="0.9"/>
-          <path d="M320 395 L358 468 L315 478 L280 466 Z" fill="#ffffff" fill-opacity="0.9"/>
           <path d="M400 580 Q510 470 570 595 L635 450 Q700 505 800 610 L800 920 L400 920 Z" fill="#3a9d9b" fill-opacity="0.75"/>
-          <path d="M0 700 Q200 665 400 700 T800 695 L800 920 L0 920 Z" fill="#2d6a9f" fill-opacity="0.58"/>
-          <path d="M155 220 Q400 85 645 220" stroke="#ffffff" stroke-width="4" stroke-dasharray="10 10" fill="none"/>
-          <circle cx="400" cy="155" r="32" fill="#ffffff" fill-opacity="0.92"/>
-          <path d="M400 144 C394 135 381 137 381 147 C381 157 400 166 400 172 C400 166 419 157 419 147 C419 137 406 135 400 144 Z" fill="#e05d87"/>
         </svg>
       `)
     },
     {
-      id: 'chapter-3-thailand-reunion',
+      id: 'chapter-3-lanterns',
       caption: '',
-      dateLabel: '31-12-2026',
+      dateLabel: 'Chapter 03',
       palette: {
         primary: '#fbd2a8',
         secondary: '#f6b8d2',
@@ -139,43 +127,22 @@ export function buildCuratedChapterPhotos() {
       dataUrl: svgToDataUrl(`
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 920" fill="none">
           <defs>
-            <linearGradient id="thaiSky" x1="0" y1="0" x2="0.4" y2="1">
+            <linearGradient id="warmSky" x1="0" y1="0" x2="0.4" y2="1">
               <stop offset="0%" stop-color="#fbc2b8"/>
               <stop offset="50%" stop-color="#fde1b8"/>
               <stop offset="100%" stop-color="#f8c8dc"/>
             </linearGradient>
-            <radialGradient id="lanternGlow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="#fff8dc" stop-opacity="0.95"/>
-              <stop offset="50%" stop-color="#ffb347" stop-opacity="0.55"/>
-              <stop offset="100%" stop-color="#ffb347" stop-opacity="0"/>
-            </radialGradient>
           </defs>
-          <rect width="800" height="920" fill="url(#thaiSky)"/>
-          <g>
-            <circle cx="230" cy="240" r="85" fill="url(#lanternGlow)"/>
-            <rect x="206" y="205" width="48" height="66" rx="22" fill="#fff2cc"/>
-            <ellipse cx="230" cy="268" rx="14" ry="5" fill="#ff9f43"/>
-            <circle cx="545" cy="195" r="95" fill="url(#lanternGlow)"/>
-            <rect x="518" y="156" width="54" height="74" rx="24" fill="#fff4d2"/>
-            <ellipse cx="545" cy="227" rx="16" ry="6" fill="#ff9f43"/>
-            <circle cx="395" cy="340" r="115" fill="url(#lanternGlow)"/>
-            <rect x="363" y="294" width="64" height="88" rx="28" fill="#fff7df"/>
-            <ellipse cx="395" cy="378" rx="20" ry="7" fill="#ff8c42"/>
-            <circle cx="640" cy="380" r="70" fill="url(#lanternGlow)"/>
-            <rect x="620" y="352" width="40" height="54" rx="18" fill="#fff2cc"/>
-            <circle cx="165" cy="430" r="65" fill="url(#lanternGlow)"/>
-            <rect x="147" y="405" width="36" height="48" rx="16" fill="#fff2cc"/>
-          </g>
+          <rect width="800" height="920" fill="url(#warmSky)"/>
+          <circle cx="395" cy="340" r="115" fill="#fff7df" fill-opacity="0.85"/>
           <path d="M0 640 Q220 620 420 640 T800 635 L800 920 L0 920 Z" fill="#487eb0" fill-opacity="0.72"/>
-          <path d="M120 695 Q400 755 680 675 L645 735 Q395 790 155 735 Z" fill="#5c4033"/>
-          <path d="M680 675 Q700 620 670 590" stroke="#5c4033" stroke-width="8" stroke-linecap="round"/>
         </svg>
       `)
     },
     {
-      id: 'chapter-4-cherry-blossom-trio',
+      id: 'chapter-4-blossoms',
       caption: '',
-      dateLabel: '10-03-2027',
+      dateLabel: 'Chapter 04',
       palette: {
         primary: '#fbc4dc',
         secondary: '#dcd0ff',
@@ -184,41 +151,16 @@ export function buildCuratedChapterPhotos() {
       dataUrl: svgToDataUrl(`
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 920" fill="none">
           <defs>
-            <linearGradient id="sakuraSky" x1="0" y1="0" x2="1" y2="1">
+            <linearGradient id="blossomSky" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0%" stop-color="#ffd6e8"/>
               <stop offset="50%" stop-color="#e8d7ff"/>
               <stop offset="100%" stop-color="#d0e8ff"/>
             </linearGradient>
           </defs>
-          <rect width="800" height="920" fill="url(#sakuraSky)"/>
+          <rect width="800" height="920" fill="url(#blossomSky)"/>
           <circle cx="560" cy="310" r="130" fill="#fff5f9" fill-opacity="0.88"/>
           <path d="M90 700 L310 430 L490 430 L710 700 Z" fill="#8d99ae" fill-opacity="0.65"/>
-          <path d="M310 430 L400 415 L490 430 L535 510 L465 495 L415 520 L365 492 L265 510 Z" fill="#ffffff" fill-opacity="0.95"/>
-          <path d="M0 160 Q220 210 380 140 M180 185 Q280 265 420 245" stroke="#6d4c41" stroke-width="10" stroke-linecap="round"/>
-          <g fill="#ff8fab">
-            <circle cx="140" cy="175" r="24"/>
-            <circle cx="220" cy="195" r="28"/>
-            <circle cx="310" cy="165" r="22"/>
-            <circle cx="380" cy="140" r="26"/>
-            <circle cx="290" cy="240" r="25"/>
-            <circle cx="420" cy="245" r="22"/>
-            <circle cx="520" cy="205" r="14" fill-opacity="0.75"/>
-            <circle cx="610" cy="285" r="12" fill-opacity="0.7"/>
-            <circle cx="465" cy="340" r="11" fill-opacity="0.65"/>
-          </g>
-          <g fill="#ffe5ec">
-            <circle cx="140" cy="175" r="10"/>
-            <circle cx="220" cy="195" r="12"/>
-            <circle cx="310" cy="165" r="9"/>
-            <circle cx="380" cy="140" r="11"/>
-            <circle cx="290" cy="240" r="10"/>
-            <circle cx="420" cy="245" r="9"/>
-          </g>
           <path d="M0 700 L800 700 L800 920 L0 920 Z" fill="#f3c4dc" fill-opacity="0.72"/>
-          <rect x="285" y="560" width="230" height="16" rx="8" fill="#d90429" fill-opacity="0.82"/>
-          <rect x="305" y="592" width="190" height="12" rx="6" fill="#d90429" fill-opacity="0.82"/>
-          <rect x="330" y="576" width="16" height="128" fill="#d90429" fill-opacity="0.82"/>
-          <rect x="454" y="576" width="16" height="128" fill="#d90429" fill-opacity="0.82"/>
         </svg>
       `)
     }
@@ -226,13 +168,123 @@ export function buildCuratedChapterPhotos() {
 }
 
 /**
+ * Fallback generic TripConfig used only when private/trip-config.json is absent in synthetic test environments.
+ * @returns {import('../js/config.js').TripConfig}
+ */
+export function buildDefaultTripConfig() {
+  return {
+    coupleNames: {
+      partnerA: 'Partner A',
+      partnerB: 'Partner B'
+    },
+    relationshipOriginDate: '2025-01-01',
+    homeCountryCode: 'US',
+    primaryDepartureDate: '2025-06-01',
+    secondaryDepartureDate: '2025-06-02',
+    pinnedCountryCodes: ['US', 'GB', 'FR', 'JP'],
+    defaultSoloLocations: {
+      preTrip: {
+        partnerA: { countryCode: 'US', cityNote: '' },
+        partnerB: { countryCode: 'US', cityNote: '' }
+      },
+      apartPhase1: {
+        partnerA: { countryCode: 'GB', cityNote: '' },
+        partnerB: { countryCode: 'FR', cityNote: '' }
+      },
+      apartPhase2: {
+        partnerA: { countryCode: 'GB', cityNote: '' },
+        partnerB: { countryCode: 'JP', cityNote: '' }
+      },
+      apartPhase3: {
+        partnerA: { countryCode: 'JP', cityNote: '' },
+        partnerB: { countryCode: 'JP', cityNote: '' }
+      }
+    },
+    reunions: [
+      {
+        id: 'reunion-sample-1',
+        title: 'Reunion Chapter 1',
+        emoji: '✨',
+        startDate: '2025-07-01',
+        endDate: '2025-07-10',
+        description: 'Sample shared chapter',
+        legs: [
+          {
+            id: 'leg-sample-1',
+            countryCode: 'FR',
+            startDate: '2025-07-01',
+            endDate: '2025-07-10',
+            notes: 'Sample leg'
+          }
+        ]
+      }
+    ],
+    milestones: [
+      {
+        id: 'ms-origin',
+        date: '2025-01-01',
+        category: 'origin',
+        emoji: '💕',
+        title: 'Origin Milestone',
+        details: 'Start date',
+        person: 'both',
+        countryCode: 'US'
+      }
+    ],
+    timeTravelPresets: [],
+    timeTravelRange: {
+      minMs: 1735689600000,
+      maxMs: 1767225600000,
+      stepMs: 3600000
+    }
+  };
+}
+
+/**
+ * Loads the canonical TripConfig from gitignored `private/trip-config.json` (or an explicit path).
+ * @param {string} repoRootDir
+ * @param {string} [explicitConfigPath]
+ * @returns {import('../js/config.js').TripConfig}
+ */
+export function loadTripConfig(repoRootDir, explicitConfigPath) {
+  const candidatePaths = [
+    explicitConfigPath,
+    path.join(repoRootDir, 'private', 'trip-config.json'),
+    path.join(repoRootDir, 'raw-photos', 'trip-config.json')
+  ].filter(Boolean);
+
+  for (const candidate of candidatePaths) {
+    if (fs.existsSync(candidate)) {
+      const raw = fs.readFileSync(candidate, 'utf8');
+      return JSON.parse(raw);
+    }
+  }
+
+  return buildDefaultTripConfig();
+}
+
+/**
+ * Loads the GitHub PAT from CLI argument or gitignored `private/github-token.txt`.
+ * @param {string | undefined} cliTokenArg
+ * @param {string} repoRootDir
+ * @returns {string | null}
+ */
+export function resolveGitHubToken(cliTokenArg, repoRootDir) {
+  if (typeof cliTokenArg === 'string' && cliTokenArg.trim().length > 0) {
+    return cliTokenArg.trim();
+  }
+  const privateTokenPath = path.join(repoRootDir, 'private', 'github-token.txt');
+  if (fs.existsSync(privateTokenPath)) {
+    const token = fs.readFileSync(privateTokenPath, 'utf8').trim();
+    if (token.length > 0) {
+      return token;
+    }
+  }
+  return null;
+}
+
+/**
  * Extracts a display date "DD-MM-YYYY" from a filename or file metadata.
- * Supports:
- * - DD-MM-YYYY, DD.MM.YYYY, DD_MM_YYYY (e.g. 15-08-2026.jpg)
- * - YYYY-MM-DD, YYYY.MM.DD, YYYY_MM_DD (e.g. 2026-08-15.jpg)
- * - DD-MM-YY, DD.MM.YY (e.g. 15-08-26.jpg)
- * - YYYYMMDD (e.g. 20260815.jpg, IMG_20260815_123456.jpg)
- * - Fallback to file creation / modification timestamp.
  * @param {string} filename
  * @param {string} [filePath]
  * @returns {string}
@@ -314,11 +366,63 @@ export function resolvePhotosDir(repoRootDir) {
 }
 
 /**
+ * Downscales and compresses a raster image via macOS `sips` into a temporary JPEG buffer.
+ * Falls back to the raw file buffer if `sips` is unavailable or image optimization is disabled.
+ * @param {string} fullPath
+ * @param {string} ext
+ * @param {boolean} optimizeImages
+ * @returns {{ buffer: Buffer, mimeType: string }}
+ */
+function readAndOptimizeImage(fullPath, ext, optimizeImages) {
+  const defaultMime = MIME_BY_EXTENSION[ext] || 'image/jpeg';
+  if (!optimizeImages || !RASTER_EXTENSIONS.has(ext) || process.platform !== 'darwin') {
+    return { buffer: fs.readFileSync(fullPath), mimeType: defaultMime };
+  }
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vault-img-'));
+  const tmpOutPath = path.join(tmpDir, 'optimized.jpg');
+  try {
+    execFileSync(
+      'sips',
+      [
+        '-Z',
+        String(MAX_IMAGE_DIMENSION_PX),
+        '-s',
+        'format',
+        'jpeg',
+        '-s',
+        'formatOptions',
+        String(JPEG_QUALITY_PCT),
+        fullPath,
+        '--out',
+        tmpOutPath
+      ],
+      { stdio: 'ignore' }
+    );
+    if (fs.existsSync(tmpOutPath)) {
+      const optimizedBuffer = fs.readFileSync(tmpOutPath);
+      return { buffer: optimizedBuffer, mimeType: 'image/jpeg' };
+    }
+  } catch {
+    // Fall back to original buffer if sips fails
+  } finally {
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {}
+  }
+
+  return { buffer: fs.readFileSync(fullPath), mimeType: defaultMime };
+}
+
+/**
  * Scans photosDir for supported image files or falls back to curated chapter SVGs.
  * @param {string} photosDir
+ * @param {{ optimizeImages?: boolean }} [options]
  * @returns {import('../js/config.js').VaultPhoto[]}
  */
-export function loadVaultPhotosFromDir(photosDir) {
+export function loadVaultPhotosFromDir(photosDir, options = {}) {
+  const optimizeImages = options.optimizeImages ?? true;
+
   if (!fs.existsSync(photosDir)) {
     return buildCuratedChapterPhotos();
   }
@@ -339,17 +443,17 @@ export function loadVaultPhotosFromDir(photosDir) {
 
   return entries.map((filename, index) => {
     const ext = path.extname(filename).toLowerCase();
-    const mimeType = MIME_BY_EXTENSION[ext];
     const fullPath = path.join(photosDir, filename);
-    const fileBuffer = fs.readFileSync(fullPath);
-    const base64 = fileBuffer.toString('base64');
+    const { buffer, mimeType } = readAndOptimizeImage(fullPath, ext, optimizeImages);
+    const base64 = buffer.toString('base64');
     const dateLabel = extractDateLabel(filename, fullPath) || `Photo #${index + 1}`;
+    const fallbackPalette = FALLBACK_PALETTES[index % FALLBACK_PALETTES.length];
     return {
       id: `photo-${index + 1}`,
       dataUrl: `data:${mimeType};base64,${base64}`,
       caption: '',
       dateLabel,
-      palette: null
+      palette: fallbackPalette
     };
   });
 }
@@ -436,11 +540,19 @@ export function encryptVaultPayload(payloadObj, password) {
 }
 
 /**
- * CLI entrypoint for generating vault.json in the repository root.
- * @param {string[]} argv
+ * CLI entrypoint for generating vault.json.
+ * @param {string[]} [argv]
+ * @param {{
+ *   repoRootDir?: string,
+ *   photosDir?: string,
+ *   outputVaultPath?: string,
+ *   tripConfigPath?: string,
+ *   optimizeImages?: boolean
+ * }} [options]
  */
-export function runCli(argv = process.argv.slice(2)) {
-  const [password, githubTokenArg, githubRepoSlugArg] = argv;
+export function runCli(argv = process.argv.slice(2), options = {}) {
+  const filteredArgs = argv.filter((arg) => arg !== '--migrate');
+  const [password, githubTokenArg, githubRepoSlugArg] = filteredArgs;
   if (!password) {
     console.error(
       'Usage: node scripts/encrypt-vault.mjs <password> [github-token] [github-repo-slug]'
@@ -449,17 +561,22 @@ export function runCli(argv = process.argv.slice(2)) {
   }
 
   const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-  const repoRootDir = path.resolve(scriptDir, '..');
-  const photosDir = resolvePhotosDir(repoRootDir);
-  const outputVaultPath = path.join(repoRootDir, 'vault.json');
+  const repoRootDir = options.repoRootDir || path.resolve(scriptDir, '..');
+  const photosDir = options.photosDir || resolvePhotosDir(repoRootDir);
+  const outputVaultPath = options.outputVaultPath || path.join(repoRootDir, 'vault.json');
 
-  const photos = loadVaultPhotosFromDir(photosDir);
+  const tripConfig = loadTripConfig(repoRootDir, options.tripConfigPath);
+  const photos = loadVaultPhotosFromDir(photosDir, {
+    optimizeImages: options.optimizeImages ?? true
+  });
+  const githubToken = resolveGitHubToken(githubTokenArg, repoRootDir);
   const githubRepo = resolveGitHubRepoMetadata(githubRepoSlugArg, repoRootDir);
 
   /** @type {import('../js/config.js').VaultPayload} */
   const payload = {
+    tripConfig,
     photos,
-    githubToken: githubTokenArg ? githubTokenArg.trim() : null,
+    githubToken,
     githubRepo,
     generatedAt: new Date().toISOString()
   };
@@ -468,7 +585,7 @@ export function runCli(argv = process.argv.slice(2)) {
   fs.writeFileSync(outputVaultPath, `${JSON.stringify(encryptedEnvelope, null, 2)}\n`, 'utf8');
 
   console.log(
-    `Encrypted ${photos.length} photo(s) into ${path.relative(process.cwd(), outputVaultPath) || 'vault.json'} (AES-256-GCM, PBKDF2-SHA256 ${PBKDF2_ITERATIONS} iterations).`
+    `Encrypted tripConfig + ${photos.length} photo(s) into ${path.relative(process.cwd(), outputVaultPath) || 'vault.json'} (AES-256-GCM, PBKDF2-SHA256 ${PBKDF2_ITERATIONS} iterations).`
   );
 }
 

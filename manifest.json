@@ -1,7 +1,7 @@
 {
-  "name": "Eitan & Shoval — Countdown & Trip Timeline",
-  "short_name": "Eitan & Shoval",
-  "description": "Backpacking countdown, timezone bridge, and split-and-merge journey timeline across South America & Asia.",
+  "name": "Trip Countdown & Timeline Board",
+  "short_name": "Trip Countdown",
+  "description": "Zero-knowledge encrypted countdown, timezone bridge, and journey timeline board.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

@@ -1,8 +1,12 @@
 images/
 raw-photos/
+private/
 .env
+.env.*
 token.txt
 *token*
+*.pem
+*.key
 .DS_Store
 Thumbs.db
 node_modules/

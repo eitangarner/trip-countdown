@@ -1,54 +1,52 @@
-# Eitan & Shoval — Backpacking Countdown & Timeline Board 💕
+# Encrypted Trip Countdown & Timeline Board
 
-A mobile-first, offline-capable Progressive Web App (PWA) built for GitHub Pages that tracks Eitan and Shoval's backpacking journeys across South America and Asia—counting down to each reunion and milestone along the way.
+A zero-dependency, zero-knowledge Progressive Web App (PWA) built for GitHub Pages that tracks two partners' travel chapters, timezone bridge, and split-and-merge reunion timeline. All personal itinerary data, photos, and sync credentials remain encrypted with **AES-256-GCM** (`PBKDF2-SHA256`, 150,000 iterations) until unlocked in the browser.
 
 ## Features
 
+- **Zero-Knowledge Client-Side Architecture**:
+  - `index.html` and `js/*.js` ship zero hardcoded personal names, dates, or destination schedules.
+  - All schedules (`tripConfig`), downscaled Retina photos (`photos`), and optional GitHub sync credentials (`githubToken`) live inside `vault.json` encrypted via `scripts/encrypt-vault.mjs`.
+  - Decrypted payloads are cached in IndexedDB (`TripCountdownSecureStorage`) with `githubToken` stripped at rest and unwrapped in volatile RAM via a non-extractable Web Crypto `CryptoKey`.
 - **Apple Music Lighter Matte-Glass Hero**:
-  - Live **"Days Together"** relationship counter since `10-01-2026`.
-  - Tactile 3D swipeable photo card deck with real-time `<canvas>` color extraction that morphs the page's ambient pastel backdrop (`--ambient-primary`, `--ambient-secondary`, `--ambient-accent`).
-  - Live `Days : Hours : Minutes : Seconds` countdown to the next reunion, separation progress bar, and automatic sub-banner for sooner milestones (birthdays, monthly anniversaries).
+  - Live **"Days Together"** counter and tactile 3D swipeable photo card deck with luminous pastel color dispersion (`--ambient-primary`, `--ambient-secondary`, `--ambient-accent`).
+  - Live `Days : Hours : Minutes : Seconds` countdown to the next reunion, separation progress bar, and automatic sub-banner for sooner milestones.
 - **"Where We Are Now" Dual Status & Time-Zone Bridge**:
   - Live local clocks and automatic hour-difference calculation across all **249 ISO countries** (`Intl.DisplayNames` + `Intl.Locale` IANA timezones).
-  - Automatic sync to the shared country and timezone whenever a Reunion leg is active (`Thailand 🇹🇭`, `Singapore 🇸🇬`, `South Korea 🇰🇷`, `Japan 🇯🇵`).
+  - Automatic sync to the shared country and timezone whenever a Reunion leg is active.
   - Native bidirectional (`dir="auto"`) support for English and Hebrew (`עברית`) status notes.
 - **Split-and-Merge Chronological Timeline**:
   - Collapsible **"Completed Chapters"** drawer that tucks past events out of the way.
-  - Parallel solo rails during Apart phases that physically curve and merge into unified Reunion cards (including the 3-leg `Singapore → South Korea → Japan` stepper).
-- **Encrypted Photo & Token Vault (`AES-256-GCM`)**:
-  - Keeps personal photos (`raw-photos/`) and your optional GitHub sync token encrypted inside `vault.json` so your public GitHub Pages repository never exposes raw photos or secrets.
+  - Parallel solo rails during Apart phases that curve and merge into unified Reunion cards (including multi-country leg steppers).
 
 ---
 
-## Quick Start (Local Preview)
+## Quick Start (Local Development & Packaging)
 
-1. **Generate `vault.json` (with your shared password)**:
+1. **Configure Private Schedule & Photos**:
+   - Place your canonical schedule JSON at `private/trip-config.json` (gitignored).
+   - Place your optional fine-grained GitHub PAT at `private/github-token.txt` (gitignored).
+   - Place your photos into `images/` or `raw-photos/` (gitignored).
+2. **Generate Encrypted `vault.json`**:
    ```bash
-   # Place any .jpg / .png / .webp photos into images/ (e.g. 15-08-2026.jpg) or raw-photos/
-   node scripts/encrypt-vault.mjs shoval
+   node scripts/encrypt-vault.mjs "<your-shared-password>"
    ```
-2. **Run the automated test suite**:
+3. **Run the Automated Test Suite**:
    ```bash
    node --test tests/*.test.mjs
    ```
-3. **Start a local static server**:
+4. **Start a Local Static Server**:
    ```bash
    python3 -m http.server 8080
    ```
-   Open `http://localhost:8080` and unlock with password `shoval`.
 
 ---
 
-## Setting Up Mobile Sync for Both Phones (GitHub Pages)
+## Setting Up Mobile Sync (GitHub Pages)
 
-To allow both you and Shoval to update your current country, city/vibe note, or milestones directly from your phones and have the changes appear on **both** phones:
-
-1. On GitHub, go to **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**.
-2. Set **Repository access** to **Only select repositories** → pick this repository.
-3. Under **Repository permissions**, set **Contents** to **Read and write**.
-4. Place your favorite couple photos into the local `images/` folder (named `DD-MM-YYYY.jpg`, e.g. `15-08-2026.jpg`; this folder is `.gitignore`d so raw photos are never uploaded).
-5. Run the encryption script with your chosen password and token:
+1. Generate a fine-grained GitHub Personal Access Token scoped **only** to this repository with **Contents: Read and write** permission, and save it to `private/github-token.txt` (or pass it as the second CLI argument).
+2. Run:
    ```bash
-   node scripts/encrypt-vault.mjs "<your-shared-password>" "<github_pat_...>" "<your-github-username>/<your-repo-name>"
+   node scripts/encrypt-vault.mjs "<your-shared-password>"
    ```
-6. Commit and push `vault.json` to GitHub, enable **GitHub Pages** (`Settings → Pages → Deploy from branch: main`), and send Shoval the link!
+3. Commit and push `vault.json` to GitHub. Live status updates and custom milestones saved from mobile are encrypted with AES-256-GCM before being committed to `live-state.json`.

@@ -1,9 +1,9 @@
 import { getCountryInfo } from './config.js';
 import {
-  diffCalendarDays,
   formatDisplayDate,
   formatShortDisplayDate,
   getEndOfDayInTimeZoneMs,
+  getReunionDurationDays,
   getStartOfDayInTimeZoneMs
 } from './countdown-engine.js';
 
@@ -29,11 +29,11 @@ function createRailConnectorSvg(direction) {
   svg.setAttribute('preserveAspectRatio', 'none');
   svg.setAttribute('aria-hidden', 'true');
 
-  const shovalPath = document.createElementNS(svgNs, 'path');
-  shovalPath.setAttribute('class', 'connector-path-shoval');
+  const primaryPath = document.createElementNS(svgNs, 'path');
+  primaryPath.setAttribute('class', 'connector-path-primary');
 
-  const eitanPath = document.createElementNS(svgNs, 'path');
-  eitanPath.setAttribute('class', 'connector-path-eitan');
+  const secondaryPath = document.createElementNS(svgNs, 'path');
+  secondaryPath.setAttribute('class', 'connector-path-secondary');
 
   const centerDot = document.createElementNS(svgNs, 'circle');
   centerDot.setAttribute('class', 'connector-node-dot');
@@ -41,35 +41,55 @@ function createRailConnectorSvg(direction) {
   centerDot.setAttribute('r', '5');
 
   if (direction === 'merge') {
-    shovalPath.setAttribute('d', 'M 100 0 C 100 24, 200 20, 200 40');
-    eitanPath.setAttribute('d', 'M 300 0 C 300 24, 200 20, 200 40');
+    primaryPath.setAttribute('d', 'M 100 0 C 100 24, 200 20, 200 40');
+    secondaryPath.setAttribute('d', 'M 300 0 C 300 24, 200 20, 200 40');
     centerDot.setAttribute('cy', '39');
   } else {
-    shovalPath.setAttribute('d', 'M 200 4 C 200 24, 100 20, 100 44');
-    eitanPath.setAttribute('d', 'M 200 4 C 200 24, 300 20, 300 44');
+    primaryPath.setAttribute('d', 'M 200 4 C 200 24, 100 20, 100 44');
+    secondaryPath.setAttribute('d', 'M 200 4 C 200 24, 300 20, 300 44');
     centerDot.setAttribute('cy', '5');
   }
 
-  svg.appendChild(shovalPath);
-  svg.appendChild(eitanPath);
+  svg.appendChild(primaryPath);
+  svg.appendChild(secondaryPath);
   svg.appendChild(centerDot);
   return svg;
 }
 
 /**
- * Renders a single MilestoneEvent card anchored to Shoval, Eitan, or Both.
+ * Resolves the slot ('primary' | 'secondary' | 'both') and display label for a milestone's `person` field.
+ * @param {string} personKey
+ * @param {import('./config.js').EvaluatedBoardState} boardState
+ * @returns {{ slot: 'primary'|'secondary'|'both', label: string }}
+ */
+function resolveMilestonePersonMeta(personKey, boardState) {
+  const primary = boardState.dualStatus?.primary;
+  const secondary = boardState.dualStatus?.secondary;
+
+  if (primary && (personKey === primary.person || personKey === 'primary')) {
+    return { slot: 'primary', label: primary.displayName };
+  }
+  if (secondary && (personKey === secondary.person || personKey === 'secondary')) {
+    return { slot: 'secondary', label: secondary.displayName };
+  }
+  return { slot: 'both', label: 'Together' };
+}
+
+/**
+ * Renders a single MilestoneEvent card anchored to Primary, Secondary, or Both.
  * @param {import('./config.js').MilestoneEvent} milestone
+ * @param {import('./config.js').EvaluatedBoardState} boardState
  * @returns {HTMLElement}
  */
-function createMilestoneRowElement(milestone) {
-  const person = milestone.person || 'both';
+function createMilestoneRowElement(milestone, boardState) {
+  const { slot, label } = resolveMilestonePersonMeta(milestone.person || 'both', boardState);
   const row = document.createElement('div');
   row.className = 'milestone-row';
-  row.dataset.person = person;
+  row.dataset.person = slot;
 
   const card = document.createElement('article');
   card.className = 'milestone-card';
-  card.dataset.person = person;
+  card.dataset.person = slot;
   card.dataset.category = milestone.category || 'custom';
 
   const emojiBadge = document.createElement('div');
@@ -91,14 +111,7 @@ function createMilestoneRowElement(milestone) {
   personTag.className = 'milestone-person-tag';
   const countryInfo = milestone.countryCode ? getCountryInfo(milestone.countryCode) : null;
   const flagSuffix = countryInfo ? ` ${countryInfo.flag}` : '';
-
-  if (person === 'shoval') {
-    personTag.textContent = `Shoval${flagSuffix}`;
-  } else if (person === 'eitan') {
-    personTag.textContent = `Eitan${flagSuffix}`;
-  } else {
-    personTag.textContent = `Together${flagSuffix}`;
-  }
+  personTag.textContent = `${label}${flagSuffix}`;
 
   metaRow.appendChild(dateSpan);
   metaRow.appendChild(personTag);
@@ -191,7 +204,7 @@ function createReunionCardElement(reunion, boardState) {
   titleGroup.appendChild(emojiSpan);
   titleGroup.appendChild(titleStack);
 
-  const totalDays = diffCalendarDays(reunion.startDate, reunion.endDate) + 1;
+  const totalDays = getReunionDurationDays(reunion);
   const durationPill = document.createElement('span');
   durationPill.className = 'reunion-duration-pill numeric-lock';
   durationPill.setAttribute('dir', 'ltr');
@@ -299,7 +312,7 @@ function renderChronologicalSequence(items, boardState, targetContainer, options
         currentSplitSegment.className = 'timeline-split-segment';
         targetContainer.appendChild(currentSplitSegment);
       }
-      currentSplitSegment.appendChild(createMilestoneRowElement(item));
+      currentSplitSegment.appendChild(createMilestoneRowElement(item, boardState));
     }
   });
 }
@@ -336,6 +349,25 @@ export class TimelineRenderer {
     this.pastToggleBtn.setAttribute('aria-expanded', String(this.isPastDrawerOpen));
     this.pastToggleBtn.classList.toggle('is-open', this.isPastDrawerOpen);
     this.pastDrawerEl.hidden = !this.isPastDrawerOpen;
+  }
+
+  /**
+   * Empties all rendered timeline nodes and resets state on device lock.
+   */
+  clear() {
+    this.isPastDrawerOpen = false;
+    if (this.statsPillEl) this.statsPillEl.textContent = '';
+    if (this.pastToggleBtn) {
+      this.pastToggleBtn.hidden = true;
+      this.pastToggleBtn.textContent = '';
+    }
+    if (this.pastDrawerEl) {
+      this.pastDrawerEl.hidden = true;
+      this.pastDrawerEl.innerHTML = '';
+    }
+    if (this.upcomingTrackEl) {
+      this.upcomingTrackEl.innerHTML = '';
+    }
   }
 
   /**

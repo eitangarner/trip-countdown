@@ -14,12 +14,14 @@ const SAMPLE_CANVAS_SIZE = 32;
  */
 export const FALLBACK_PHOTOS = [
   {
-    id: 'fallback-tlv-origin',
+    id: 'fallback-card-1',
     caption: '',
-    dateLabel: '10-01-2026',
+    dateLabel: 'Chapter 01',
     palette: {
       primary: '#f6b8d0',
       secondary: '#fbd3a7',
+      tertiary: '#a8d8f8',
+      quaternary: '#ffe4b5',
       accent: '#e35d8a'
     },
     dataUrl: `data:image/svg+xml;utf8,${encodeURIComponent(`
@@ -47,12 +49,14 @@ export const FALLBACK_PHOTOS = [
     `)}`
   },
   {
-    id: 'fallback-patagonia-peaks',
+    id: 'fallback-card-2',
     caption: '',
-    dateLabel: '06-12-2026',
+    dateLabel: 'Chapter 02',
     palette: {
       primary: '#b3dcf7',
       secondary: '#c8c4f7',
+      tertiary: '#f9d4e4',
+      quaternary: '#9cc8eb',
       accent: '#4686db'
     },
     dataUrl: `data:image/svg+xml;utf8,${encodeURIComponent(`
@@ -80,12 +84,14 @@ export const FALLBACK_PHOTOS = [
     `)}`
   },
   {
-    id: 'fallback-thailand-reunion',
+    id: 'fallback-card-3',
     caption: '',
-    dateLabel: '31-12-2026',
+    dateLabel: 'Chapter 03',
     palette: {
       primary: '#f8c5a8',
       secondary: '#a8ebd8',
+      tertiary: '#f7d794',
+      quaternary: '#8de0c8',
       accent: '#de6b48'
     },
     dataUrl: `data:image/svg+xml;utf8,${encodeURIComponent(`
@@ -109,12 +115,14 @@ export const FALLBACK_PHOTOS = [
     `)}`
   },
   {
-    id: 'fallback-asia-trio-sakura',
+    id: 'fallback-card-4',
     caption: '',
-    dateLabel: '10-03-2027',
+    dateLabel: 'Chapter 04',
     palette: {
       primary: '#f7bdd8',
       secondary: '#d5bdf8',
+      tertiary: '#bde0fe',
+      quaternary: '#f8a5c2',
       accent: '#d95294'
     },
     dataUrl: `data:image/svg+xml;utf8,${encodeURIComponent(`
@@ -250,12 +258,20 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+const DEFAULT_LUMINOUS_PALETTE = {
+  primary: '#f6b8d0',
+  secondary: '#b8d8f8',
+  tertiary: '#fbd3a7',
+  quaternary: '#d5bdf8',
+  accent: '#e86f9a'
+};
+
 /**
  * Clamps an HSL color to the DESIGN.md luminous pastel range:
- * - ambient ('primary' | 'secondary'): Lightness 68%–84%, Saturation 65%–90%
+ * - ambient ('primary' | 'secondary' | 'tertiary' | 'quaternary'): Lightness 68%–84%, Saturation 65%–90%
  * - interactive ('accent'): Lightness 48%–58%, Saturation 65%–90%
  * @param {{ h: number, s: number, l: number }} hsl
- * @param {'primary' | 'secondary' | 'accent'} role
+ * @param {'primary' | 'secondary' | 'tertiary' | 'quaternary' | 'accent'} role
  * @returns {string} Clamped hex color
  */
 export function clampHslForRole(hsl, role = 'primary') {
@@ -266,10 +282,58 @@ export function clampHslForRole(hsl, role = 'primary') {
   return hslToHex(hsl.h, s, l);
 }
 
+function circularHueBucketDistance(bucketIdxA, bucketIdxB) {
+  const diff = Math.abs(bucketIdxA - bucketIdxB);
+  return Math.min(diff, 12 - diff);
+}
+
+function bucketToAverageHsl(bucket) {
+  return rgbToHsl(
+    bucket.rSum / bucket.weightSum,
+    bucket.gSum / bucket.weightSum,
+    bucket.bSum / bucket.weightSum
+  );
+}
+
+function expandHslListToFourRoles(seedHsls) {
+  const expanded = [...seedHsls];
+  const harmonicHueOffsets = [28, -28, 52];
+  const lightnessOffsets = [5, -5, 8];
+
+  while (expanded.length < 4) {
+    const stepIdx = expanded.length - 1;
+    const baseHsl = seedHsls[expanded.length % seedHsls.length];
+    expanded.push({
+      h: ((baseHsl.h + harmonicHueOffsets[stepIdx % harmonicHueOffsets.length]) % 360 + 360) % 360,
+      s: baseHsl.s,
+      l: clamp(baseHsl.l + lightnessOffsets[stepIdx % lightnessOffsets.length], 69, 83)
+    });
+  }
+
+  return expanded;
+}
+
+function buildClampedPalette(seedHsls, accentHsl = null) {
+  const [primaryHsl, secondaryHsl, tertiaryHsl, quaternaryHsl] = expandHslListToFourRoles(seedHsls);
+  const resolvedAccentHsl = accentHsl || {
+    h: primaryHsl.h,
+    s: Math.max(primaryHsl.s, 75),
+    l: 53
+  };
+
+  return {
+    primary: clampHslForRole(primaryHsl, 'primary'),
+    secondary: clampHslForRole(secondaryHsl, 'secondary'),
+    tertiary: clampHslForRole(tertiaryHsl, 'tertiary'),
+    quaternary: clampHslForRole(quaternaryHsl, 'quaternary'),
+    accent: clampHslForRole(resolvedAccentHsl, 'accent')
+  };
+}
+
 /**
- * Samples RGBA pixel buffer and extracts luminous pastel primary, secondary, and accent colors.
+ * Samples RGBA pixel buffer and extracts a 4-color luminous pastel palette plus interactive accent.
  * @param {Uint8ClampedArray | number[]} rgbaData
- * @returns {{ primary: string, secondary: string, accent: string }}
+ * @returns {{ primary: string, secondary: string, tertiary: string, quaternary: string, accent: string }}
  */
 function extractPaletteFromPixels(rgbaData) {
   const buckets = Array.from({ length: 12 }, () => ({
@@ -305,58 +369,47 @@ function extractPaletteFromPixels(rgbaData) {
     .sort((a, b) => b.weightSum - a.weightSum);
 
   if (rankedBuckets.length === 0) {
-    return {
-      primary: '#f6b8d0',
-      secondary: '#b8d8f8',
-      accent: '#e86f9a'
-    };
+    return { ...DEFAULT_LUMINOUS_PALETTE };
   }
 
   const dominant = rankedBuckets[0];
-  const primaryHsl = rgbToHsl(
-    dominant.rSum / dominant.weightSum,
-    dominant.gSum / dominant.weightSum,
-    dominant.bSum / dominant.weightSum
-  );
+  const viableBuckets = rankedBuckets.filter((bucket) => bucket.weightSum >= dominant.weightSum * 0.03);
+  const selectedBuckets = [dominant];
 
-  // Pick a secondary bucket with a distinct hue when available
-  const distinctSecondary = rankedBuckets.find(
-    (candidate) => Math.abs(candidate.idx - dominant.idx) >= 2 && Math.abs(candidate.idx - dominant.idx) <= 10
-  ) || rankedBuckets[1];
+  // First pass: prefer buckets with distinct hues (>= 60 deg apart on the 12-hue wheel)
+  for (const candidate of viableBuckets) {
+    if (selectedBuckets.length >= 4) break;
+    const isDistinctFromSelected = selectedBuckets.every(
+      (chosen) => circularHueBucketDistance(candidate.idx, chosen.idx) >= 2
+    );
+    if (isDistinctFromSelected) {
+      selectedBuckets.push(candidate);
+    }
+  }
 
-  const secondaryHsl = distinctSecondary
-    ? rgbToHsl(
-        distinctSecondary.rSum / distinctSecondary.weightSum,
-        distinctSecondary.gSum / distinctSecondary.weightSum,
-        distinctSecondary.bSum / distinctSecondary.weightSum
-      )
-    : { h: (primaryHsl.h + 48) % 360, s: primaryHsl.s, l: primaryHsl.l };
+  // Second pass: include remaining viable buckets if fewer than 4 distinct clusters exist
+  for (const candidate of viableBuckets) {
+    if (selectedBuckets.length >= 4) break;
+    if (!selectedBuckets.includes(candidate)) {
+      selectedBuckets.push(candidate);
+    }
+  }
 
-  return {
-    primary: clampHslForRole(primaryHsl, 'primary'),
-    secondary: clampHslForRole(secondaryHsl, 'secondary'),
-    accent: clampHslForRole({ h: primaryHsl.h, s: Math.max(primaryHsl.s, 75), l: 53 }, 'accent')
-  };
+  return buildClampedPalette(selectedBuckets.map(bucketToAverageHsl));
 }
 
 /**
  * Extracts a luminous Apple Music matte-glass palette from an image element, canvas,
  * ImageData buffer, VaultPhoto object, or SVG/hex string.
- * Clamps lightness to 68%–84% and saturation to 65%–90% for primary/secondary,
+ * Clamps lightness to 68%–84% and saturation to 65%–90% for primary/secondary/tertiary/quaternary,
  * and lightness 48%–58% for accent.
  *
  * @param {HTMLImageElement | HTMLCanvasElement | ImageData | import('./config.js').VaultPhoto | string | null} imageSource
- * @returns {{ primary: string, secondary: string, accent: string }}
+ * @returns {{ primary: string, secondary: string, tertiary: string, quaternary: string, accent: string } | null}
  */
 export function extractLuminousPalette(imageSource) {
-  const defaultPalette = {
-    primary: '#f6b8d0',
-    secondary: '#b8d8f8',
-    accent: '#e86f9a'
-  };
-
   if (!imageSource) {
-    return defaultPalette;
+    return { ...DEFAULT_LUMINOUS_PALETTE };
   }
 
   // 1. Direct ImageData or pixel buffer object ({ data: Uint8ClampedArray })
@@ -396,18 +449,20 @@ export function extractLuminousPalette(imageSource) {
     }
     const isSvg = !imageSource.dataUrl || imageSource.dataUrl.includes('data:image/svg+xml');
     if (isSvg && imageSource.palette && imageSource.palette.primary) {
-      const pRgb = parseHexColor(imageSource.palette.primary);
-      const sRgb = parseHexColor(imageSource.palette.secondary || imageSource.palette.primary);
+      const roleHexes = [
+        imageSource.palette.primary,
+        imageSource.palette.secondary,
+        imageSource.palette.tertiary,
+        imageSource.palette.quaternary
+      ].filter(Boolean);
+      const parsedHsls = roleHexes
+        .map(parseHexColor)
+        .filter(Boolean)
+        .map((rgb) => rgbToHsl(rgb.r, rgb.g, rgb.b));
       const aRgb = parseHexColor(imageSource.palette.accent || imageSource.palette.primary);
-      if (pRgb && sRgb && aRgb) {
-        const pHsl = rgbToHsl(pRgb.r, pRgb.g, pRgb.b);
-        const sHsl = rgbToHsl(sRgb.r, sRgb.g, sRgb.b);
-        const aHsl = rgbToHsl(aRgb.r, aRgb.g, aRgb.b);
-        return {
-          primary: clampHslForRole(pHsl, 'primary'),
-          secondary: clampHslForRole(sHsl, 'secondary'),
-          accent: clampHslForRole(aHsl, 'accent')
-        };
+
+      if (parsedHsls.length > 0 && aRgb) {
+        return buildClampedPalette(parsedHsls, rgbToHsl(aRgb.r, aRgb.g, aRgb.b));
       }
     }
     if (typeof imageSource.dataUrl === 'string' && isSvg) {
@@ -420,23 +475,18 @@ export function extractLuminousPalette(imageSource) {
     const decoded = imageSource.includes('%23') ? decodeURIComponent(imageSource) : imageSource;
     const hexMatches = decoded.match(/#[0-9a-fA-F]{6}\b/g);
     if (hexMatches && hexMatches.length > 0) {
-      const firstRgb = parseHexColor(hexMatches[0]);
-      const secondRgb = parseHexColor(hexMatches[Math.min(1, hexMatches.length - 1)]);
-      if (firstRgb && secondRgb) {
-        const pHsl = rgbToHsl(firstRgb.r, firstRgb.g, firstRgb.b);
-        const sHsl = hexMatches.length > 1
-          ? rgbToHsl(secondRgb.r, secondRgb.g, secondRgb.b)
-          : { h: (pHsl.h + 45) % 360, s: pHsl.s, l: pHsl.l };
-        return {
-          primary: clampHslForRole(pHsl, 'primary'),
-          secondary: clampHslForRole(sHsl, 'secondary'),
-          accent: clampHslForRole({ h: pHsl.h, s: Math.max(pHsl.s, 75), l: 53 }, 'accent')
-        };
+      const uniqueHexes = [...new Set(hexMatches.map((h) => h.toLowerCase()))].slice(0, 4);
+      const parsedHsls = uniqueHexes
+        .map(parseHexColor)
+        .filter(Boolean)
+        .map((rgb) => rgbToHsl(rgb.r, rgb.g, rgb.b));
+      if (parsedHsls.length > 0) {
+        return buildClampedPalette(parsedHsls);
       }
     }
   }
 
-  return defaultPalette;
+  return { ...DEFAULT_LUMINOUS_PALETTE };
 }
 
 /**
@@ -450,9 +500,10 @@ export class PhotoStackController {
    *   container?: HTMLElement | string,
    *   ambientContainer?: HTMLElement | string,
    *   photos?: import('./config.js').VaultPhoto[],
+   *   deferInitialRender?: boolean,
    *   autoRotate?: boolean,
    *   autoRotateIntervalMs?: number,
-   *   onPhotoChange?: (photo: import('./config.js').VaultPhoto, index: number, palette: { primary: string, secondary: string, accent: string }) => void
+   *   onPhotoChange?: (photo: import('./config.js').VaultPhoto, index: number, palette: { primary: string, secondary: string, tertiary: string, quaternary: string, accent: string }) => void
    * }} containerOrConfig
    * @param {Object} [options]
    */
@@ -484,7 +535,9 @@ export class PhotoStackController {
     /** @type {import('./config.js').VaultPhoto[]} */
     this.photos = Array.isArray(config.photos) && config.photos.length > 0
       ? [...config.photos]
-      : [...FALLBACK_PHOTOS];
+      : config.deferInitialRender
+        ? []
+        : [...FALLBACK_PHOTOS];
 
     this.activeIndex = 0;
     this.autoRotateTimerId = null;
@@ -503,15 +556,39 @@ export class PhotoStackController {
     this.boundKeyDown = this.handleKeyDown.bind(this);
 
     if (this.container) {
-      this.render();
+      if (this.photos.length > 0) {
+        this.render();
+      }
       this.bindEvents();
-    } else {
+    } else if (this.photos.length > 0) {
       this.syncActiveAmbient();
     }
 
-    if (this.isAutoRotating) {
+    if (this.isAutoRotating && this.photos.length > 0) {
       this.startAutoRotate();
     }
+  }
+
+  /**
+   * Clears all rendered photo cards and resets ambient CSS variables on vault lock.
+   */
+  clear() {
+    this.stopAutoRotate();
+    this.photos = [];
+    this.activeIndex = 0;
+    this.cardElements = [];
+    this.dotElements = [];
+    if (this.container) {
+      this.container.innerHTML = '';
+    }
+    if (this.ambientContainer) {
+      const auraImg = this.ambientContainer.querySelector?.('.ambient-photo-aura');
+      if (auraImg) {
+        auraImg.hidden = true;
+        auraImg.removeAttribute?.('src');
+      }
+    }
+    this.applyAmbientPalette(DEFAULT_LUMINOUS_PALETTE, null);
   }
 
   /**
@@ -580,6 +657,7 @@ export class PhotoStackController {
       img.className = 'photo-card-img';
       img.src = photo.dataUrl;
       img.alt = photo.caption || `Photo ${index + 1}`;
+      img.decoding = 'async';
       img.draggable = false;
 
       const onImageReady = () => {
@@ -810,30 +888,36 @@ export class PhotoStackController {
   }
 
   /**
-   * Applies `--ambient-primary`, `--ambient-secondary`, and `--ambient-accent` to `:root`
-   * and updates the ambient stage aura element.
-   * @param {{ primary: string, secondary: string, accent: string }} palette
+   * Applies `--ambient-primary`, `--ambient-secondary`, `--ambient-tertiary`, `--ambient-quaternary`,
+   * and `--ambient-accent` to `:root` and updates the ambient stage aura element.
+   * @param {{ primary: string, secondary: string, tertiary?: string, quaternary?: string, accent: string }} palette
    * @param {import('./config.js').VaultPhoto} [photo]
    */
   applyAmbientPalette(palette, photo = this.getActivePhoto()) {
     if (typeof document === 'undefined') return;
 
     const rootStyle = document.documentElement.style;
-    rootStyle.setProperty('--ambient-primary', palette.primary);
-    rootStyle.setProperty('--ambient-secondary', palette.secondary);
-    rootStyle.setProperty('--ambient-accent', palette.accent);
+    rootStyle.setProperty('--ambient-primary', palette.primary || DEFAULT_LUMINOUS_PALETTE.primary);
+    rootStyle.setProperty('--ambient-secondary', palette.secondary || DEFAULT_LUMINOUS_PALETTE.secondary);
+    rootStyle.setProperty('--ambient-tertiary', palette.tertiary || palette.primary || DEFAULT_LUMINOUS_PALETTE.tertiary);
+    rootStyle.setProperty('--ambient-quaternary', palette.quaternary || palette.secondary || DEFAULT_LUMINOUS_PALETTE.quaternary);
+    rootStyle.setProperty('--ambient-accent', palette.accent || DEFAULT_LUMINOUS_PALETTE.accent);
 
     if (this.ambientContainer && photo?.dataUrl) {
-      let auraImg = this.ambientContainer.querySelector('.ambient-photo-aura');
-      if (!auraImg) {
+      let auraImg = this.ambientContainer.querySelector?.('.ambient-photo-aura') || null;
+      if (!auraImg && typeof document.createElement === 'function' && typeof this.ambientContainer.appendChild === 'function') {
         auraImg = document.createElement('img');
         auraImg.className = 'ambient-photo-aura';
         auraImg.alt = '';
         auraImg.setAttribute('aria-hidden', 'true');
         this.ambientContainer.appendChild(auraImg);
       }
-      if (auraImg.getAttribute('src') !== photo.dataUrl) {
-        auraImg.setAttribute('src', photo.dataUrl);
+      if (auraImg) {
+        if (auraImg.getAttribute?.('src') !== photo.dataUrl) {
+          auraImg.setAttribute?.('src', photo.dataUrl);
+        }
+        auraImg.hidden = false;
+        auraImg.removeAttribute?.('hidden');
       }
     }
   }

@@ -1,9 +1,9 @@
 /**
- * Offline-First Service Worker for Eitan & Shoval's Countdown Board.
- * Caches core app shell assets on install and serves stale-while-revalidate for vault.json & live-state.json.
+ * Offline-First Service Worker for Encrypted Trip Countdown Board.
+ * Caches core app shell assets on install and serves network-first with cache fallback for vault.json & live-state.json.
  */
 
-const CACHE_NAME = 'shoval-countdown-board-v3';
+const CACHE_NAME = 'trip-countdown-board-v4';
 
 const APP_SHELL_ASSETS = [
   './',
@@ -11,14 +11,13 @@ const APP_SHELL_ASSETS = [
   './manifest.json',
   './styles/main.css',
   './js/config.js',
+  './js/storage-vault.js',
   './js/crypto-vault.js',
   './js/countdown-engine.js',
   './js/photo-stack.js',
   './js/timeline-renderer.js',
   './js/github-sync.js',
-  './js/app.js',
-  './vault.json',
-  './live-state.json'
+  './js/app.js'
 ];
 
 self.addEventListener('install', (event) => {

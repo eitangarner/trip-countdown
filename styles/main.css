@@ -1,5 +1,5 @@
 /**
- * Eitan & Shoval — Backpacking Countdown & Timeline Board
+ * Trip Countdown & Timeline Board
  * Visual System: Apple Music Lighter Matte Glass & Bidirectional (LTR/RTL) Layout
  */
 
@@ -15,6 +15,18 @@
   initial-value: #b8d8f8;
 }
 
+@property --ambient-tertiary {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #fbd3a7;
+}
+
+@property --ambient-quaternary {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #d5bdf8;
+}
+
 @property --ambient-accent {
   syntax: '<color>';
   inherits: true;
@@ -25,6 +37,8 @@
   /* Dynamic Photo-Extracted Palette (updated smoothly over 800ms by photo-stack.js) */
   --ambient-primary: #f6b8d0;    /* Soft rose default */
   --ambient-secondary: #b8d8f8;  /* Sky pastel default */
+  --ambient-tertiary: #fbd3a7;   /* Warm amber pastel default */
+  --ambient-quaternary: #d5bdf8; /* Soft lavender pastel default */
   --ambient-accent: #e86f9a;     /* Richer interactive accent (buttons, active rail, progress fill) */
 
   /* Base Canvas & Matte Glass Surfaces */
@@ -49,8 +63,8 @@
   --ink-on-accent: #ffffff;
 
   /* Track & Person Accents */
-  --track-shoval: #e05d87;       /* Warm rose-coral rail */
-  --track-eitan: #3b82f6;        /* Crisp ocean-blue rail */
+  --track-primary: #e05d87;      /* Warm rose-coral rail */
+  --track-secondary: #3b82f6;    /* Crisp ocean-blue rail */
   --track-together: #d946ef;     /* Merged reunion gradient anchor */
 
   /* Layout & Geometry */
@@ -67,6 +81,8 @@
   transition:
     --ambient-primary var(--transition-ambient),
     --ambient-secondary var(--transition-ambient),
+    --ambient-tertiary var(--transition-ambient),
+    --ambient-quaternary var(--transition-ambient),
     --ambient-accent var(--transition-ambient);
 }
 
@@ -164,21 +180,20 @@ button {
   pointer-events: none;
   overflow: hidden;
   background:
-    radial-gradient(circle at 22% 18%, var(--ambient-primary) 0%, transparent 58%),
-    radial-gradient(circle at 78% 32%, var(--ambient-secondary) 0%, transparent 62%),
-    radial-gradient(circle at 50% 82%, color-mix(in srgb, var(--ambient-primary) 45%, var(--ambient-secondary)) 0%, transparent 65%),
+    radial-gradient(circle at 18% 16%, var(--ambient-primary) 0%, transparent 56%),
+    radial-gradient(circle at 82% 20%, var(--ambient-secondary) 0%, transparent 58%),
+    radial-gradient(circle at 22% 82%, var(--ambient-tertiary) 0%, transparent 60%),
+    radial-gradient(circle at 80% 84%, var(--ambient-quaternary) 0%, transparent 60%),
+    radial-gradient(circle at 50% 48%, color-mix(in srgb, var(--ambient-primary) 42%, var(--ambient-tertiary)) 0%, transparent 68%),
     var(--bg-canvas);
   transition: background var(--transition-ambient);
 }
 
-.ambient-stage::before,
-.ambient-stage::after,
 .ambient-blob {
-  content: "";
   position: absolute;
   border-radius: var(--radius-pill);
-  filter: blur(75px) saturate(1.75);
-  opacity: 0.56;
+  filter: blur(80px) saturate(1.75);
+  opacity: 0.52;
   pointer-events: none;
   will-change: transform, background-color;
   transition:
@@ -186,7 +201,6 @@ button {
     transform 6s ease-in-out;
 }
 
-.ambient-stage::before,
 .ambient-blob-primary {
   width: min(85vw, 480px);
   height: min(85vw, 480px);
@@ -195,13 +209,28 @@ button {
   background-color: var(--ambient-primary);
 }
 
-.ambient-stage::after,
 .ambient-blob-secondary {
   width: min(85vw, 460px);
   height: min(85vw, 460px);
-  inset-block-start: 14%;
+  inset-block-start: 10%;
   inset-inline-end: -12%;
   background-color: var(--ambient-secondary);
+}
+
+.ambient-blob-tertiary {
+  width: min(82vw, 450px);
+  height: min(82vw, 450px);
+  inset-block-end: -10%;
+  inset-inline-start: -8%;
+  background-color: var(--ambient-tertiary);
+}
+
+.ambient-blob-quaternary {
+  width: min(82vw, 440px);
+  height: min(82vw, 440px);
+  inset-block-end: -8%;
+  inset-inline-end: -10%;
+  background-color: var(--ambient-quaternary);
 }
 
 .ambient-aura,
@@ -210,17 +239,17 @@ button {
 .ambient-stage canvas,
 .ambient-stage img {
   position: absolute;
-  inset-block-start: 4%;
-  inset-inline-start: 50%;
-  transform: translateX(-50%) scale(1.25);
-  width: min(92vw, 460px);
-  height: min(92vw, 460px);
+  inset-block-start: -15%;
+  inset-inline-start: -15%;
+  width: 130%;
+  height: 130%;
   object-fit: cover;
-  border-radius: 50%;
-  filter: blur(75px) saturate(1.75);
-  opacity: 0.46;
-  mask-image: radial-gradient(circle, rgba(0, 0, 0, 1) 25%, rgba(0, 0, 0, 0) 76%);
-  -webkit-mask-image: radial-gradient(circle, rgba(0, 0, 0, 1) 25%, rgba(0, 0, 0, 0) 76%);
+  filter: blur(90px) saturate(1.85) brightness(1.12);
+  opacity: 0.44;
+  transform: translate3d(0, 0, 0) scale(1.06);
+  will-change: transform, opacity;
+  mask-image: radial-gradient(ellipse at 50% 45%, rgba(0, 0, 0, 0.96) 22%, rgba(0, 0, 0, 0.52) 72%, rgba(0, 0, 0, 0) 100%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 45%, rgba(0, 0, 0, 0.96) 22%, rgba(0, 0, 0, 0.52) 72%, rgba(0, 0, 0, 0) 100%);
   transition: opacity var(--transition-ambient), transform var(--transition-ambient);
 }
 
@@ -386,7 +415,7 @@ main {
   padding-block: 14px;
   padding-inline: 20px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--ambient-accent), var(--track-shoval));
+  background: linear-gradient(135deg, var(--ambient-accent), var(--track-primary));
   color: var(--ink-on-accent);
   font-size: 1rem;
   font-weight: 600;
@@ -561,8 +590,13 @@ main {
     transform var(--transition-spring),
     opacity 320ms ease,
     box-shadow 320ms ease;
-  will-change: transform, opacity;
   cursor: grab;
+}
+
+.photo-card[data-depth="0"],
+.photo-card[data-depth="1"],
+.photo-card[data-depth="2"] {
+  will-change: transform, opacity;
 }
 
 .photo-card:active {
@@ -950,7 +984,7 @@ main {
   padding-block: 6px;
   padding-inline: 14px;
   border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, var(--track-shoval), var(--track-together));
+  background: linear-gradient(135deg, var(--track-primary), var(--track-together));
   color: var(--ink-on-accent);
   font-size: 0.85rem;
   font-weight: 700;
@@ -1038,17 +1072,17 @@ main {
   inset-block-start: 0;
   inset-inline: 0;
   height: 3.5px;
-  background: var(--track-shoval);
+  background: var(--track-primary);
 }
 
-.person-status-card[data-person="shoval"]::before,
-.person-status-card.person-shoval::before {
-  background: var(--track-shoval);
+.person-status-card[data-person="primary"]::before,
+.person-status-card.person-primary::before {
+  background: var(--track-primary);
 }
 
-.person-status-card[data-person="eitan"]::before,
-.person-status-card.person-eitan::before {
-  background: var(--track-eitan);
+.person-status-card[data-person="secondary"]::before,
+.person-status-card.person-secondary::before {
+  background: var(--track-secondary);
 }
 
 .person-card-header {
@@ -1073,12 +1107,12 @@ main {
   width: 8px;
   height: 8px;
   border-radius: var(--radius-pill);
-  background: var(--track-shoval);
+  background: var(--track-primary);
 }
 
-.person-status-card[data-person="eitan"] .person-dot,
-.person-status-card.person-eitan .person-dot {
-  background: var(--track-eitan);
+.person-status-card[data-person="secondary"] .person-dot,
+.person-status-card.person-secondary .person-dot {
+  background: var(--track-secondary);
 }
 
 .person-country-row {
@@ -1279,23 +1313,23 @@ main {
   z-index: 0;
 }
 
-/* Left/Start Rail: Shoval */
+/* Left/Start Rail: Partner A */
 .timeline-split-segment::before {
   inset-inline-start: calc(25% - 1.5px);
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--track-shoval) 65%, transparent),
-    var(--track-shoval)
+    color-mix(in srgb, var(--track-primary) 65%, transparent),
+    var(--track-primary)
   );
 }
 
-/* Right/End Rail: Eitan */
+/* Right/End Rail: Partner B */
 .timeline-split-segment::after {
   inset-inline-end: calc(25% - 1.5px);
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--track-eitan) 65%, transparent),
-    var(--track-eitan)
+    color-mix(in srgb, var(--track-secondary) 65%, transparent),
+    var(--track-secondary)
   );
 }
 
@@ -1308,17 +1342,17 @@ main {
   pointer-events: none;
 }
 
-.connector-path-shoval {
+.connector-path-primary {
   fill: none;
-  stroke: var(--track-shoval);
+  stroke: var(--track-primary);
   stroke-width: 3;
   stroke-linecap: round;
   stroke-dasharray: 5 4;
 }
 
-.connector-path-eitan {
+.connector-path-secondary {
   fill: none;
-  stroke: var(--track-eitan);
+  stroke: var(--track-secondary);
   stroke-width: 3;
   stroke-linecap: round;
   stroke-dasharray: 5 4;
@@ -1338,12 +1372,12 @@ main {
   display: flex;
 }
 
-.milestone-row[data-person="shoval"] {
+.milestone-row[data-person="primary"] {
   justify-content: flex-start;
   padding-inline-end: 18%;
 }
 
-.milestone-row[data-person="eitan"] {
+.milestone-row[data-person="secondary"] {
   justify-content: flex-end;
   padding-inline-start: 18%;
 }
@@ -1371,16 +1405,16 @@ main {
   transition: transform var(--transition-fast);
 }
 
-.milestone-card[data-person="shoval"] {
+.milestone-card[data-person="primary"] {
   width: 82%;
   margin-inline-end: auto;
-  border-inline-start: 4px solid var(--track-shoval);
+  border-inline-start: 4px solid var(--track-primary);
 }
 
-.milestone-card[data-person="eitan"] {
+.milestone-card[data-person="secondary"] {
   width: 82%;
   margin-inline-start: auto;
-  border-inline-end: 4px solid var(--track-eitan);
+  border-inline-end: 4px solid var(--track-secondary);
 }
 
 .milestone-card[data-person="both"] {
@@ -1435,14 +1469,14 @@ main {
   color: var(--ink-secondary);
 }
 
-.milestone-card[data-person="shoval"] .milestone-person-tag {
-  background: color-mix(in srgb, var(--track-shoval) 15%, transparent);
-  color: var(--track-shoval);
+.milestone-card[data-person="primary"] .milestone-person-tag {
+  background: color-mix(in srgb, var(--track-primary) 15%, transparent);
+  color: var(--track-primary);
 }
 
-.milestone-card[data-person="eitan"] .milestone-person-tag {
-  background: color-mix(in srgb, var(--track-eitan) 15%, transparent);
-  color: var(--track-eitan);
+.milestone-card[data-person="secondary"] .milestone-person-tag {
+  background: color-mix(in srgb, var(--track-secondary) 15%, transparent);
+  color: var(--track-secondary);
 }
 
 .milestone-card[data-person="both"] .milestone-person-tag {
@@ -1533,7 +1567,7 @@ main {
   padding-block: 4px;
   padding-inline: 10px;
   border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, var(--track-shoval), var(--track-together));
+  background: linear-gradient(135deg, var(--track-primary), var(--track-together));
   color: var(--ink-on-accent);
   font-size: 0.74rem;
   font-weight: 700;
