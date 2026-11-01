@@ -18,6 +18,8 @@
  * @property {string} countryCode - Country code from COUNTRY_CATALOG
  * @property {string} startDate - Inclusive start date "YYYY-MM-DD" in leg's local timezone
  * @property {string} endDate - Inclusive end date "YYYY-MM-DD" in leg's local timezone
+ * @property {string} [startTime] - Optional start time "HH:MM" in leg's local timezone
+ * @property {string} [endTime] - Optional end time "HH:MM" in leg's local timezone
  * @property {string} [label] - Short display title for the leg
  * @property {string} [notes] - Optional itinerary highlight
  */
@@ -37,6 +39,7 @@
  * @typedef {Object} MilestoneEvent
  * @property {string} id - Unique milestone ID
  * @property {string} date - Calendar date "YYYY-MM-DD"
+ * @property {string} [time] - Optional event time "HH:MM"
  * @property {'origin'|'departure'|'birthday'|'anniversary'|'reunion-start'|'tbd'|'custom'} category
  * @property {string} emoji - Display emoji
  * @property {string} title - Milestone headline (supports LTR/RTL via dir="auto")
@@ -60,6 +63,8 @@
  * @property {Record<string, PersonStatusOverride>} statusOverrides
  * @property {ReunionChapter[]} [customReunions] - Optional overridden reunion list
  * @property {MilestoneEvent[]} [customMilestones] - Additional user-created milestones from mobile Edit Mode
+ * @property {Record<string, Partial<MilestoneEvent> & { hidden?: boolean }>} [milestoneOverrides]
+ * @property {Record<string, Partial<ReunionChapter> & { hidden?: boolean, legs?: ReunionLeg[] }>} [chapterOverrides]
  */
 
 /**

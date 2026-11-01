@@ -85,6 +85,14 @@ export function createMilestoneRowElement(milestone, boardState, onEditItem = nu
   const datePages = createPhotoDateElement(milestone.date, { isCompact: true });
   dateCol.appendChild(datePages);
 
+  if (milestone.time) {
+    const timeBadge = document.createElement('span');
+    timeBadge.className = 'milestone-country-badge numeric-lock';
+    timeBadge.setAttribute('dir', 'ltr');
+    timeBadge.textContent = `⏰ ${milestone.time}`;
+    dateCol.appendChild(timeBadge);
+  }
+
   const countryInfo = milestone.countryCode ? getCountryInfo(milestone.countryCode) : null;
   if (countryInfo) {
     const countryBadge = document.createElement('span');
@@ -160,14 +168,15 @@ function resolveLegTimelineStatus(leg, index, allLegs, nowMs, activeLegId) {
 }
 
 /**
- * Renders a converged wide ReunionChapter card with its internal multi-country leg stepper.
+ * Renders a converged wide ReunionChapter card with its horizontal route-map country chips.
  * @param {import('./config.js').ReunionChapter} reunion
  * @param {import('./config.js').EvaluatedBoardState} boardState
  * @param {((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null} [onEditItem]
  * @param {((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null} [onDeleteItem]
+ * @param {((reunion: import('./config.js').ReunionChapter, leg: import('./config.js').ReunionLeg) => void) | null} [onEditLeg]
  * @returns {HTMLElement}
  */
-function createReunionCardElement(reunion, boardState, onEditItem = null, onDeleteItem = null) {
+function createReunionCardElement(reunion, boardState, onEditItem = null, onDeleteItem = null, onEditLeg = null) {
   const isActiveReunion = boardState.activeReunion?.reunion.id === reunion.id;
   const activeLegId = isActiveReunion ? boardState.activeReunion?.activeLeg.id ?? null : null;
 
@@ -245,45 +254,72 @@ function createReunionCardElement(reunion, boardState, onEditItem = null, onDele
   card.appendChild(header);
 
   if (Array.isArray(reunion.legs) && reunion.legs.length > 0) {
-    const stepper = document.createElement('div');
-    stepper.className = 'reunion-leg-stepper';
+    const chipsWrapper = document.createElement('div');
+    chipsWrapper.className = 'reunion-leg-chips-wrapper';
+
+    const chipsScroller = document.createElement('div');
+    chipsScroller.className = 'reunion-leg-chips';
+    chipsScroller.setAttribute('role', 'list');
 
     reunion.legs.forEach((leg, idx) => {
       const country = getCountryInfo(leg.countryCode);
       const status = resolveLegTimelineStatus(leg, idx, reunion.legs, boardState.nowMs, activeLegId);
 
-      const legItem = document.createElement('div');
-      legItem.className = `reunion-leg-item${status === 'active' ? ' is-active' : ''}${status === 'past' ? ' is-past' : ''}`;
-      legItem.dataset.status = status;
+      const chip = document.createElement('div');
+      chip.className = `reunion-leg-chip${status === 'active' ? ' is-active' : ''}${status === 'past' ? ' is-past' : ''}`;
+      chip.dataset.status = status;
+      chip.dataset.legId = leg.id;
+      chip.setAttribute('role', 'button');
+      chip.setAttribute('tabindex', '0');
+      chip.setAttribute('aria-label', `Edit country leg: ${leg.label || country.name}`);
+      chip.title = `Click to edit ${leg.label || country.name}`;
 
-      const legMain = document.createElement('div');
-      legMain.className = 'reunion-leg-main';
+      if (onEditLeg) {
+        chip.addEventListener('click', (e) => {
+          e.stopPropagation();
+          onEditLeg(reunion, leg);
+        });
+        chip.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            onEditLeg(reunion, leg);
+          }
+        });
+      }
 
       const flagSpan = document.createElement('span');
-      flagSpan.className = 'reunion-leg-flag';
+      flagSpan.className = 'reunion-leg-chip-flag';
       flagSpan.textContent = country.flag;
 
-      const infoCol = document.createElement('div');
-      infoCol.className = 'reunion-leg-info';
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'reunion-leg-chip-name';
+      nameSpan.setAttribute('dir', 'auto');
+      nameSpan.textContent = leg.label || country.name;
 
-      const countryNameEl = document.createElement('div');
-      countryNameEl.className = 'reunion-leg-country';
-      countryNameEl.textContent = leg.label || country.name;
+      const timeSuffix = leg.startTime ? ` ${leg.startTime}` : '';
+      const dateText = `${formatShortDisplayDate(leg.startDate)}${timeSuffix} – ${formatShortDisplayDate(leg.endDate)}`;
+      const datesSpan = document.createElement('span');
+      datesSpan.className = 'reunion-leg-chip-dates numeric-lock';
+      datesSpan.setAttribute('dir', 'ltr');
+      datesSpan.textContent = dateText;
 
-      infoCol.appendChild(countryNameEl);
+      chip.appendChild(flagSpan);
+      chip.appendChild(nameSpan);
+      chip.appendChild(datesSpan);
+      chipsScroller.appendChild(chip);
 
-      legMain.appendChild(flagSpan);
-      legMain.appendChild(infoCol);
-
-      const datesBadge = createPhotoDateElement(`${formatDisplayDate(leg.startDate)} – ${formatDisplayDate(leg.endDate)}`, { isCompact: true });
-      datesBadge.classList.add('reunion-leg-dates');
-
-      legItem.appendChild(legMain);
-      legItem.appendChild(datesBadge);
-      stepper.appendChild(legItem);
+      if (idx < reunion.legs.length - 1) {
+        const arrowSpan = document.createElement('span');
+        arrowSpan.className = 'reunion-leg-chip-arrow';
+        arrowSpan.textContent = '➔';
+        arrowSpan.setAttribute('aria-hidden', 'true');
+        chipsScroller.appendChild(arrowSpan);
+      }
     });
 
-    card.appendChild(stepper);
+    chipsWrapper.appendChild(chipsScroller);
+    card.appendChild(chipsWrapper);
   }
 
   return card;
@@ -296,13 +332,14 @@ function createReunionCardElement(reunion, boardState, onEditItem = null, onDele
  * @param {HTMLElement} targetContainer
  * @param {((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null} [onEditItem]
  * @param {((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null} [onDeleteItem]
+ * @param {((reunion: import('./config.js').ReunionChapter, leg: import('./config.js').ReunionLeg) => void) | null} [onEditLeg]
  */
-function renderChronologicalSequence(items, boardState, targetContainer, onEditItem = null, onDeleteItem = null) {
+function renderChronologicalSequence(items, boardState, targetContainer, onEditItem = null, onDeleteItem = null, onEditLeg = null) {
   targetContainer.innerHTML = '';
 
   items.forEach((item) => {
     if (isReunionChapter(item)) {
-      targetContainer.appendChild(createReunionCardElement(item, boardState, onEditItem, onDeleteItem));
+      targetContainer.appendChild(createReunionCardElement(item, boardState, onEditItem, onDeleteItem, onEditLeg));
     } else {
       targetContainer.appendChild(createMilestoneRowElement(item, boardState, onEditItem, onDeleteItem));
     }
@@ -320,7 +357,8 @@ export class TimelineRenderer {
    *   pastDrawerEl: HTMLElement | null,
    *   upcomingTrackEl: HTMLElement | null,
    *   onEditItem?: ((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null,
-   *   onDeleteItem?: ((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null
+   *   onDeleteItem?: ((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null,
+   *   onEditLeg?: ((reunion: import('./config.js').ReunionChapter, leg: import('./config.js').ReunionLeg) => void) | null
    * }} elements
    */
   constructor(elements) {
@@ -330,6 +368,7 @@ export class TimelineRenderer {
     this.upcomingTrackEl = elements.upcomingTrackEl;
     this.onEditItem = elements.onEditItem || null;
     this.onDeleteItem = elements.onDeleteItem || null;
+    this.onEditLeg = elements.onEditLeg || null;
     this.isPastDrawerOpen = false;
 
     if (this.pastToggleBtn && this.pastDrawerEl) {
@@ -389,12 +428,12 @@ export class TimelineRenderer {
         const arrow = this.isPastDrawerOpen ? '▴' : '▾';
         this.pastToggleBtn.innerHTML = `Completed Chapters (<span class="numeric-lock" dir="ltr">${pastItems.length}</span>) ${arrow}`;
         this.syncPastDrawerVisibility();
-        renderChronologicalSequence(pastItems, boardState, this.pastDrawerEl, this.onEditItem, this.onDeleteItem);
+        renderChronologicalSequence(pastItems, boardState, this.pastDrawerEl, this.onEditItem, this.onDeleteItem, this.onEditLeg);
       }
     }
 
     if (this.upcomingTrackEl) {
-      renderChronologicalSequence(upcomingItems, boardState, this.upcomingTrackEl, this.onEditItem, this.onDeleteItem);
+      renderChronologicalSequence(upcomingItems, boardState, this.upcomingTrackEl, this.onEditItem, this.onDeleteItem, this.onEditLeg);
     }
   }
 }

@@ -5,6 +5,8 @@ import {
   getZonedDateParts,
   getStartOfDayInTimeZoneMs,
   getEndOfDayInTimeZoneMs,
+  getZonedWallClockEpochMs,
+  parseTimeParts,
   getUtcOffsetMinutes,
   formatDisplayDate,
   formatShortDisplayDate,
@@ -368,4 +370,92 @@ test('LiveState statusOverrides: ignored during reunion if older than leg start,
   assert.equal(stateWithFreshOverride.dualStatus.primary.countryCode, 'TH');
   assert.equal(stateWithFreshOverride.dualStatus.primary.cityNote, 'Island Bay');
   assert.equal(stateWithFreshOverride.dualStatus.primary.isAutoSyncedToReunion, false);
+});
+
+test('Time Precision & Multi-Leg Route Editing: parseTimeParts, zoned wall clock, and leg time boundaries', () => {
+  assert.deepEqual(parseTimeParts('14:30'), [14, 30]);
+  assert.deepEqual(parseTimeParts('09:05'), [9, 5]);
+  assert.deepEqual(parseTimeParts(null, 0, 0), [0, 0]);
+  assert.deepEqual(parseTimeParts(undefined, 23, 59), [23, 59]);
+
+  // Specific wall-clock epoch in Singapore (UTC+8) at 14:30
+  const sgEpoch = getZonedWallClockEpochMs('2026-03-10', 'Asia/Singapore', 14, 30, 0, 0);
+  const sgParts = getZonedDateParts(sgEpoch, 'Asia/Singapore');
+  assert.equal(sgParts.dateStr, '2026-03-10');
+  assert.equal(sgParts.timeStr, '14:30');
+
+  // Multi-leg chapter with custom times & leg labels
+  const timedChapter = {
+    id: 'reunion-timed',
+    title: 'Southeast Asia Journey',
+    emoji: '✈️',
+    startDate: '2026-03-10',
+    endDate: '2026-03-20',
+    description: 'Timed multi-stop trip',
+    legs: [
+      {
+        id: 'leg-1',
+        countryCode: 'SG',
+        label: 'Marina Bay & Sentosa',
+        startDate: '2026-03-10',
+        endDate: '2026-03-13',
+        startTime: '10:00',
+        endTime: '16:00'
+      },
+      {
+        id: 'leg-2',
+        countryCode: 'JP',
+        label: 'Tokyo Cherry Blossoms',
+        startDate: '2026-03-13',
+        endDate: '2026-03-20',
+        startTime: '16:00',
+        endTime: '22:00'
+      }
+    ]
+  };
+
+  const config = {
+    ...SYNTHETIC_TRIP_CONFIG,
+    reunions: [timedChapter]
+  };
+
+  // 1 minute before Singapore start time
+  const beforeStartMs = getZonedWallClockEpochMs('2026-03-10', 'Asia/Singapore', 9, 59, 0, 0);
+  const beforeState = evaluateBoardState(config, null, beforeStartMs);
+  assert.equal(beforeState.phase, 'APART');
+
+  // Exactly at Singapore start time
+  const atStartMs = getZonedWallClockEpochMs('2026-03-10', 'Asia/Singapore', 10, 0, 0, 0);
+  const activeState = evaluateBoardState(config, null, atStartMs);
+  assert.equal(activeState.phase, 'TOGETHER');
+  assert.equal(activeState.activeReunion?.activeLeg.countryCode, 'SG');
+  assert.equal(activeState.activeReunion?.activeLeg.label, 'Marina Bay & Sentosa');
+
+  // Overridden chapter legs via liveState
+  const liveStateWithOverriddenLegs = {
+    schemaVersion: 1,
+    updatedAt: new Date().toISOString(),
+    statusOverrides: {},
+    chapterOverrides: {
+      'reunion-timed': {
+        title: 'Updated Southeast Asia Tour',
+        legs: [
+          {
+            id: 'leg-1-modified',
+            countryCode: 'TH',
+            label: 'Bangkok Old Town',
+            startDate: '2026-03-08',
+            endDate: '2026-03-15',
+            startTime: '12:00'
+          }
+        ]
+      }
+    }
+  };
+
+  const overriddenState = evaluateBoardState(config, liveStateWithOverriddenLegs, atStartMs);
+  assert.equal(overriddenState.phase, 'TOGETHER');
+  assert.equal(overriddenState.activeReunion?.reunion.title, 'Updated Southeast Asia Tour');
+  assert.equal(overriddenState.activeReunion?.activeLeg.countryCode, 'TH');
+  assert.equal(overriddenState.activeReunion?.activeLeg.label, 'Bangkok Old Town');
 });
