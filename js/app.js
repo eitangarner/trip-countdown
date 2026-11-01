@@ -939,9 +939,30 @@ export class CountdownBoardApp {
    * @param {'countdown' | 'timeline'} viewName
    */
   switchView(viewName) {
+    const previousView = this.activeView;
     this.activeView = viewName;
-    if (this.dom.viewCountdown) this.dom.viewCountdown.hidden = viewName !== 'countdown';
-    if (this.dom.viewTimeline) this.dom.viewTimeline.hidden = viewName !== 'timeline';
+    if (this.dom.bottomNav) {
+      this.dom.bottomNav.setAttribute('data-active-view', viewName);
+    }
+    const isForward = (previousView === 'countdown' && viewName === 'timeline');
+    const isBackward = (previousView === 'timeline' && viewName === 'countdown');
+
+    if (this.dom.viewCountdown) {
+      this.dom.viewCountdown.hidden = viewName !== 'countdown';
+      if (viewName === 'countdown' && isBackward) {
+        this.dom.viewCountdown.classList.remove('slide-forward', 'slide-backward');
+        void this.dom.viewCountdown.offsetWidth;
+        this.dom.viewCountdown.classList.add('slide-backward');
+      }
+    }
+    if (this.dom.viewTimeline) {
+      this.dom.viewTimeline.hidden = viewName !== 'timeline';
+      if (viewName === 'timeline' && isForward) {
+        this.dom.viewTimeline.classList.remove('slide-forward', 'slide-backward');
+        void this.dom.viewTimeline.offsetWidth;
+        this.dom.viewTimeline.classList.add('slide-forward');
+      }
+    }
     this.dom.navBtnCountdown?.classList.toggle('is-active', viewName === 'countdown');
     this.dom.navBtnTimeline?.classList.toggle('is-active', viewName === 'timeline');
     if (this.dom.fabEditBtn) this.dom.fabEditBtn.hidden = viewName !== 'countdown';

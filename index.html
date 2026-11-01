@@ -186,8 +186,7 @@
       <!-- Section 3: Split-and-Merge Chronological Timeline -->
       <section class="timeline-section" aria-label="Journey Timeline">
         <div class="section-header-row">
-          <h3 class="section-title">Journey &amp; Reunion Timeline</h3>
-          <button type="button" class="timeline-add-btn" id="add-timeline-item-btn">+ Add Event / Leg</button>
+          <button type="button" class="timeline-add-btn" id="add-timeline-item-btn">+ Add Event</button>
         </div>
 
         <div class="timeline-stats-bar">
@@ -217,7 +216,8 @@
   </button>
 
   <!-- 5. App Bottom Navigation Bar -->
-  <nav class="bottom-nav" id="bottom-nav" hidden aria-label="Main Navigation">
+  <nav class="bottom-nav" id="bottom-nav" hidden aria-label="Main Navigation" data-active-view="countdown">
+    <div class="bottom-nav-slider" id="bottom-nav-slider" aria-hidden="true"></div>
     <button type="button" class="bottom-nav-item is-active" id="nav-btn-countdown" data-view="countdown">
       <span class="bottom-nav-icon" aria-hidden="true">⏳</span>
       <span class="bottom-nav-label">Countdown</span>

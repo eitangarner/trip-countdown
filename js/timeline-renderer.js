@@ -386,8 +386,7 @@ export class TimelineRenderer {
         this.pastDrawerEl.hidden = true;
       } else {
         this.pastToggleBtn.hidden = false;
-        const arrow = this.isPastDrawerOpen ? '▴' : '▾';
-        this.pastToggleBtn.innerHTML = `Completed Chapters (<span class="numeric-lock" dir="ltr">${pastItems.length}</span>) ${arrow}`;
+        this.pastToggleBtn.innerHTML = `<span>Completed Chapters</span><span class="past-chapters-badge numeric-lock" dir="ltr">${pastItems.length}</span><span class="past-chapters-arrow" aria-hidden="true">▾</span>`;
         this.syncPastDrawerVisibility();
         renderChronologicalSequence(pastItems, boardState, this.pastDrawerEl, this.onEditItem, this.onDeleteItem);
       }
