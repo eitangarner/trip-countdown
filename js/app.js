@@ -1399,11 +1399,14 @@ export class CountdownBoardApp {
     let emoji = '';
     let title = '';
     let datePillText = '';
-    let travelTagText = '';
     let locationText = '';
     let targetStartMs = 0;
     let targetEndMs = 0;
     let subtext = '';
+
+    const personMeta = this.latestBoardState
+      ? resolveMilestonePersonMeta(item.person || 'both', this.latestBoardState)
+      : { icon: '💕', label: 'Together' };
 
     if (isChapter) {
       emoji = item.emoji || '🌺';
@@ -1423,7 +1426,6 @@ export class CountdownBoardApp {
         return `${c.flag} ${l.label || c.name}`;
       }).join(' • ') || `${startCountry.flag} ${startCountry.name}`;
 
-      travelTagText = 'Traveling Together';
       locationText = countryNames;
       subtext = item.description || '';
     } else {
@@ -1435,11 +1437,7 @@ export class CountdownBoardApp {
       targetStartMs = getStartOfDayInTimeZoneMs(item.date, countryInfo.timeZone);
       targetEndMs = getEndOfDayInTimeZoneMs(item.date, countryInfo.timeZone);
 
-      const meta = this.latestBoardState
-        ? resolveMilestonePersonMeta(item.person || 'both', this.latestBoardState)
-        : { icon: '💕', label: 'Together' };
-
-      locationText = `${countryInfo.flag} ${countryInfo.name} • ${meta.icon} ${meta.label}`;
+      locationText = `${countryInfo.flag} ${countryInfo.name}`;
       subtext = item.details || '';
     }
 
@@ -1449,13 +1447,8 @@ export class CountdownBoardApp {
       this.dom.eventModalDatePill.replaceChildren(createPhotoDateElement(datePillText, { isCompact: true }));
     }
     if (this.dom.eventModalTravelTag) {
-      if (travelTagText) {
-        this.dom.eventModalTravelTag.textContent = travelTagText;
-        this.dom.eventModalTravelTag.hidden = false;
-      } else {
-        this.dom.eventModalTravelTag.textContent = '';
-        this.dom.eventModalTravelTag.hidden = true;
-      }
+      this.dom.eventModalTravelTag.textContent = `${personMeta.icon} ${personMeta.label}`;
+      this.dom.eventModalTravelTag.hidden = false;
     }
     if (this.dom.eventModalLocation) this.dom.eventModalLocation.textContent = locationText;
     if (this.dom.eventModalSubtext) {
