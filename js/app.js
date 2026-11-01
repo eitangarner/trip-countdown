@@ -103,12 +103,9 @@ export class CountdownBoardApp {
       customMilestones: []
     };
 
-    /**
-     * When null, board runs on real live time (Date.now()).
-     * When set to an epoch ms timestamp, board runs in Time-Travel Preview mode.
-     * @type {number | null}
-     */
-    this.previewEpochMs = null;
+    this.activeView = 'countdown';
+    /** @type {'primary' | 'secondary'} */
+    this.activeProfile = 'primary';
     this.lastTimelineSignature = '';
     this.lastSoonerMilestoneSignature = '';
 
@@ -139,9 +136,12 @@ export class CountdownBoardApp {
       vaultUnlockBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('vault-unlock-btn')),
 
       boardContainer: document.getElementById('board-container'),
-      previewBanner: document.getElementById('preview-banner'),
-      previewBannerDate: document.getElementById('preview-banner-date'),
-      previewResetBtn: document.getElementById('preview-reset-btn'),
+      viewCountdown: document.getElementById('view-countdown'),
+      viewTimeline: document.getElementById('view-timeline'),
+
+      bottomNav: document.getElementById('bottom-nav'),
+      navBtnCountdown: document.getElementById('nav-btn-countdown'),
+      navBtnTimeline: document.getElementById('nav-btn-timeline'),
 
       relationshipDaysPrimary: document.getElementById('relationship-days-primary'),
       relationshipDaysBreakdown: document.getElementById('relationship-days-breakdown'),
@@ -196,22 +196,18 @@ export class CountdownBoardApp {
       fabEditBtn: document.getElementById('fab-edit-btn'),
       editSheetBackdrop: document.getElementById('edit-sheet-backdrop'),
       editBottomSheet: document.getElementById('edit-bottom-sheet'),
+      sheetHandleWrapper: document.getElementById('sheet-handle-wrapper'),
+      sheetHeader: document.getElementById('sheet-header'),
       editSheetCloseBtn: document.getElementById('edit-sheet-close-btn'),
-
-      sliderDateReadout: document.getElementById('slider-date-readout'),
-      timeTravelSlider: /** @type {HTMLInputElement | null} */ (document.getElementById('time-travel-slider')),
-      presetChipsRow: document.getElementById('preset-chips-row'),
 
       statusUpdateForm: document.getElementById('status-update-form'),
       syncStatusPill: document.getElementById('sync-status-pill'),
-      editPrimaryCountryLabel: document.getElementById('edit-primary-country-label'),
-      editPrimaryCountry: /** @type {HTMLSelectElement | null} */ (document.getElementById('edit-primary-country')),
-      editPrimaryNoteLabel: document.getElementById('edit-primary-note-label'),
-      editPrimaryNote: /** @type {HTMLInputElement | null} */ (document.getElementById('edit-primary-note')),
-      editSecondaryCountryLabel: document.getElementById('edit-secondary-country-label'),
-      editSecondaryCountry: /** @type {HTMLSelectElement | null} */ (document.getElementById('edit-secondary-country')),
-      editSecondaryNoteLabel: document.getElementById('edit-secondary-note-label'),
-      editSecondaryNote: /** @type {HTMLInputElement | null} */ (document.getElementById('edit-secondary-note')),
+      segBtnPrimary: /** @type {HTMLButtonElement | null} */ (document.getElementById('seg-btn-primary')),
+      segBtnSecondary: /** @type {HTMLButtonElement | null} */ (document.getElementById('seg-btn-secondary')),
+      editCurrentCountryLabel: document.getElementById('edit-current-country-label'),
+      editCurrentCountry: /** @type {HTMLSelectElement | null} */ (document.getElementById('edit-current-country')),
+      editCurrentNoteLabel: document.getElementById('edit-current-note-label'),
+      editCurrentNote: /** @type {HTMLInputElement | null} */ (document.getElementById('edit-current-note')),
       clearStatusOverridesBtn: document.getElementById('clear-status-overrides-btn'),
 
       addMilestoneForm: document.getElementById('add-milestone-form'),
@@ -288,18 +284,18 @@ export class CountdownBoardApp {
 
     if (this.dom.primaryNameLabel) this.dom.primaryNameLabel.textContent = primaryName;
     if (this.dom.secondaryNameLabel) this.dom.secondaryNameLabel.textContent = secondaryName;
-    if (this.dom.editPrimaryCountryLabel) {
-      this.dom.editPrimaryCountryLabel.textContent = `${primaryName}'s Current Country`;
+    if (this.dom.segBtnPrimary) this.dom.segBtnPrimary.textContent = primaryName;
+    if (this.dom.segBtnSecondary) this.dom.segBtnSecondary.textContent = secondaryName;
+
+    try {
+      const savedProfile = localStorage?.getItem('trip_preferred_profile');
+      if (savedProfile === 'secondary' || savedProfile === 'primary') {
+        this.activeProfile = savedProfile;
+      }
+    } catch {
+      // Ignore storage errors in restricted contexts
     }
-    if (this.dom.editPrimaryNoteLabel) {
-      this.dom.editPrimaryNoteLabel.textContent = `${primaryName}'s City / Vibe Note (Optional)`;
-    }
-    if (this.dom.editSecondaryCountryLabel) {
-      this.dom.editSecondaryCountryLabel.textContent = `${secondaryName}'s Current Country`;
-    }
-    if (this.dom.editSecondaryNoteLabel) {
-      this.dom.editSecondaryNoteLabel.textContent = `${secondaryName}'s City / Vibe Note (Optional)`;
-    }
+    this.updateProfileSelectorUI();
 
     if (this.dom.msPersonSelect) {
       this.dom.msPersonSelect.innerHTML = '';
@@ -321,21 +317,15 @@ export class CountdownBoardApp {
       : PINNED_COUNTRY_CODES;
     const homeCode = this.#tripConfig.homeCountryCode || 'US';
 
-    populateCountrySelect(this.dom.editPrimaryCountry, homeCode, pinnedCodes);
-    populateCountrySelect(this.dom.editSecondaryCountry, homeCode, pinnedCodes);
+    populateCountrySelect(this.dom.editCurrentCountry, homeCode, pinnedCodes);
     populateCountrySelect(this.dom.msCountrySelect, pinnedCodes[2] || homeCode, pinnedCodes);
 
-    if (this.dom.timeTravelSlider && this.#tripConfig.timeTravelRange) {
-      this.dom.timeTravelSlider.min = String(this.#tripConfig.timeTravelRange.minMs);
-      this.dom.timeTravelSlider.max = String(this.#tripConfig.timeTravelRange.maxMs);
-      this.dom.timeTravelSlider.step = String(this.#tripConfig.timeTravelRange.stepMs || 3600000);
-    }
-    this.renderTimeTravelPresets();
-
     if (this.dom.boardContainer) this.dom.boardContainer.hidden = false;
+    if (this.dom.bottomNav) this.dom.bottomNav.hidden = false;
     if (this.dom.fabEditBtn) this.dom.fabEditBtn.hidden = false;
     if (this.dom.editBottomSheet) this.dom.editBottomSheet.hidden = false;
     this.dom.vaultOverlay?.classList.add('is-unlocked');
+    this.switchView('countdown');
 
     if (Array.isArray(payload.photos) && payload.photos.length > 0) {
       this.photoStack.setPhotos(payload.photos);
@@ -361,7 +351,6 @@ export class CountdownBoardApp {
     this.#vaultCryptoKey = null;
     this.#tripConfig = null;
     this.githubRepo = null;
-    this.previewEpochMs = null;
     this.lastTimelineSignature = '';
     this.lastSoonerMilestoneSignature = '';
     this.liveState = {
@@ -417,17 +406,17 @@ export class CountdownBoardApp {
     if (this.dom.cdMinutes) this.dom.cdMinutes.textContent = '--';
     if (this.dom.cdSeconds) this.dom.cdSeconds.textContent = '--';
 
-    if (this.dom.presetChipsRow) this.dom.presetChipsRow.innerHTML = '';
-    if (this.dom.editPrimaryCountry) this.dom.editPrimaryCountry.innerHTML = '';
-    if (this.dom.editSecondaryCountry) this.dom.editSecondaryCountry.innerHTML = '';
+    if (this.dom.editCurrentCountry) this.dom.editCurrentCountry.innerHTML = '';
     if (this.dom.msCountrySelect) this.dom.msCountrySelect.innerHTML = '';
     if (this.dom.msPersonSelect) this.dom.msPersonSelect.innerHTML = '';
 
     if (this.dom.boardContainer) this.dom.boardContainer.hidden = true;
+    if (this.dom.bottomNav) this.dom.bottomNav.hidden = true;
     if (this.dom.fabEditBtn) this.dom.fabEditBtn.hidden = true;
     if (this.dom.editBottomSheet) this.dom.editBottomSheet.hidden = true;
-    if (this.dom.previewBanner) this.dom.previewBanner.hidden = true;
     if (this.dom.subMilestoneBanner) this.dom.subMilestoneBanner.hidden = true;
+
+    this.switchView('countdown');
 
     if (this.dom.vaultPasswordInput) this.dom.vaultPasswordInput.value = '';
     if (this.dom.vaultErrorMsg) this.dom.vaultErrorMsg.textContent = '';
@@ -488,45 +477,58 @@ export class CountdownBoardApp {
       }
     });
 
-    // 2. Bottom Sheet Open / Close
+    // 2. Bottom Nav View Switcher
+    this.dom.navBtnCountdown?.addEventListener('click', () => {
+      this.switchView('countdown');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    this.dom.navBtnTimeline?.addEventListener('click', () => {
+      this.switchView('timeline');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    // 3. Bottom Sheet Open / Close
     this.dom.fabEditBtn?.addEventListener('click', () => this.openEditSheet());
     this.dom.editSheetCloseBtn?.addEventListener('click', () => this.closeEditSheet());
     this.dom.editSheetBackdrop?.addEventListener('click', () => this.closeEditSheet());
 
-    // 3. Time-Travel Slider & Reset
-    this.dom.timeTravelSlider?.addEventListener('input', () => {
-      const val = Number(this.dom.timeTravelSlider.value);
-      this.setPreviewTimestamp(val);
+    // Touch drag-down gesture to dismiss the bottom sheet
+    this.bindSheetDragGestures();
+
+    // 4. Profile Selector Buttons in Quick Status Update
+    this.dom.segBtnPrimary?.addEventListener('click', () => {
+      this.activeProfile = 'primary';
+      try { localStorage?.setItem('trip_preferred_profile', 'primary'); } catch {}
+      this.updateProfileSelectorUI();
+      this.syncEditFormWithState();
+    });
+    this.dom.segBtnSecondary?.addEventListener('click', () => {
+      this.activeProfile = 'secondary';
+      try { localStorage?.setItem('trip_preferred_profile', 'secondary'); } catch {}
+      this.updateProfileSelectorUI();
+      this.syncEditFormWithState();
     });
 
-    this.dom.previewResetBtn?.addEventListener('click', () => {
-      this.setPreviewTimestamp(null);
-    });
-
-    // 4. Quick Status Update Form
+    // 5. Quick Status Update Form (focused on activeProfile)
     this.dom.statusUpdateForm?.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!this.#tripConfig) return;
 
       const { firstPartnerKey, secondPartnerKey } = resolvePartnerConfigMeta(this.#tripConfig);
+      const targetPartnerKey = this.activeProfile === 'secondary' ? secondPartnerKey : firstPartnerKey;
       const homeCode = this.#tripConfig.homeCountryCode || 'US';
       const nowIso = new Date(this.getEffectiveNowMs()).toISOString();
-      const primaryCountry = this.dom.editPrimaryCountry?.value || homeCode;
-      const primaryNote = (this.dom.editPrimaryNote?.value || '').trim();
-      const secondaryCountry = this.dom.editSecondaryCountry?.value || homeCode;
-      const secondaryNote = (this.dom.editSecondaryNote?.value || '').trim();
+      const countryCode = this.dom.editCurrentCountry?.value || homeCode;
+      const cityNote = (this.dom.editCurrentNote?.value || '').trim();
 
+      const existingOverrides = this.liveState.statusOverrides || {};
       this.liveState = {
         ...this.liveState,
         statusOverrides: {
-          [firstPartnerKey]: {
-            countryCode: primaryCountry,
-            cityNote: primaryNote,
-            updatedAt: nowIso
-          },
-          [secondPartnerKey]: {
-            countryCode: secondaryCountry,
-            cityNote: secondaryNote,
+          ...existingOverrides,
+          [targetPartnerKey]: {
+            countryCode,
+            cityNote,
             updatedAt: nowIso
           }
         }
@@ -543,12 +545,17 @@ export class CountdownBoardApp {
       this.updateSyncBadge(result.syncedRemotely ? 'synced' : 'pending', result.message);
     });
 
-    // 5. Clear Manual Status Overrides (Reset to Auto Schedule)
+    // 6. Clear Manual Status Overrides (Reset to Auto Schedule for active profile)
     this.dom.clearStatusOverridesBtn?.addEventListener('click', async () => {
       if (!this.#tripConfig) return;
+      const { firstPartnerKey, secondPartnerKey } = resolvePartnerConfigMeta(this.#tripConfig);
+      const targetPartnerKey = this.activeProfile === 'secondary' ? secondPartnerKey : firstPartnerKey;
+      const updatedOverrides = { ...(this.liveState.statusOverrides || {}) };
+      delete updatedOverrides[targetPartnerKey];
+
       this.liveState = {
         ...this.liveState,
-        statusOverrides: {}
+        statusOverrides: updatedOverrides
       };
       this.tick(true);
       this.syncEditFormWithState();
@@ -561,7 +568,7 @@ export class CountdownBoardApp {
       this.updateSyncBadge(result.syncedRemotely ? 'synced' : 'pending', 'Reset to automatic schedule');
     });
 
-    // 6. Add Custom Milestone Form
+    // 7. Add Custom Milestone Form
     this.dom.addMilestoneForm?.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!this.#tripConfig) return;
@@ -607,12 +614,12 @@ export class CountdownBoardApp {
       this.updateSyncBadge(result.syncedRemotely ? 'synced' : 'pending', result.message);
     });
 
-    // 7. Lock Device Button
+    // 8. Lock Device Button
     this.dom.lockDeviceBtn?.addEventListener('click', () => {
       void this.lockAndPurgeBoard();
     });
 
-    // 8. Resume tick immediately when tab becomes visible
+    // 9. Resume tick immediately when tab becomes visible
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden && this.#tripConfig) {
@@ -622,75 +629,97 @@ export class CountdownBoardApp {
     }
   }
 
-  renderTimeTravelPresets() {
-    if (!this.dom.presetChipsRow || !this.#tripConfig) return;
-    this.dom.presetChipsRow.innerHTML = '';
+  /**
+   * Binds touch drag-down gesture on the sheet handle, header, and top of the scrollable sheet.
+   */
+  bindSheetDragGestures() {
+    const sheet = this.dom.editBottomSheet;
+    const dragTarget = this.dom.sheetHandleWrapper || this.dom.sheetHeader;
+    if (!sheet) return;
 
-    const liveChip = document.createElement('button');
-    liveChip.type = 'button';
-    liveChip.className = 'preset-chip is-active';
-    liveChip.dataset.presetId = 'live';
-    liveChip.textContent = '🟢 Live Now';
-    liveChip.addEventListener('click', () => this.setPreviewTimestamp(null));
-    this.dom.presetChipsRow.appendChild(liveChip);
+    let touchStartY = 0;
+    let currentDeltaY = 0;
+    let isTrackingTouch = false;
 
-    const presets = Array.isArray(this.#tripConfig.timeTravelPresets)
-      ? this.#tripConfig.timeTravelPresets
-      : [];
+    const onTouchStart = (/** @type {TouchEvent} */ e) => {
+      if (!sheet.classList.contains('is-open')) return;
+      touchStartY = e.touches[0].clientY;
+      currentDeltaY = 0;
+      isTrackingTouch = true;
+      sheet.style.transition = 'none';
+    };
 
-    for (const preset of presets) {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'preset-chip';
-      chip.dataset.presetId = preset.id;
-      chip.textContent = preset.label;
-      chip.addEventListener('click', () => {
-        const epochMs = Date.parse(preset.isoDate);
-        if (!Number.isNaN(epochMs)) {
-          this.setPreviewTimestamp(epochMs, preset.id);
+    const onTouchMove = (/** @type {TouchEvent} */ e) => {
+      if (!isTrackingTouch) return;
+      const deltaY = e.touches[0].clientY - touchStartY;
+      if (deltaY > 0) {
+        currentDeltaY = deltaY;
+        sheet.style.transform = `translateY(${deltaY}px)`;
+        if (e.cancelable) e.preventDefault();
+      }
+    };
+
+    const onTouchEnd = () => {
+      if (!isTrackingTouch) return;
+      isTrackingTouch = false;
+      sheet.style.transition = '';
+      if (currentDeltaY > 80) {
+        this.closeEditSheet();
+      } else {
+        sheet.style.transform = '';
+      }
+      currentDeltaY = 0;
+    };
+
+    dragTarget?.addEventListener('touchstart', onTouchStart, { passive: true });
+    dragTarget?.addEventListener('touchmove', onTouchMove, { passive: false });
+    dragTarget?.addEventListener('touchend', onTouchEnd, { passive: true });
+    dragTarget?.addEventListener('touchcancel', onTouchEnd, { passive: true });
+
+    // Also support drag-down directly inside sheet when scrolled to top
+    sheet.addEventListener('touchstart', (e) => {
+      if (sheet.scrollTop <= 0) {
+        touchStartY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    sheet.addEventListener('touchmove', (e) => {
+      if (sheet.scrollTop <= 0) {
+        const delta = e.touches[0].clientY - touchStartY;
+        if (delta > 0 && !isTrackingTouch) {
+          isTrackingTouch = true;
+          sheet.style.transition = 'none';
         }
-      });
-      this.dom.presetChipsRow.appendChild(chip);
-    }
+        if (isTrackingTouch) {
+          currentDeltaY = delta;
+          sheet.style.transform = `translateY(${delta}px)`;
+          if (e.cancelable) e.preventDefault();
+        }
+      }
+    }, { passive: false });
+
+    sheet.addEventListener('touchend', onTouchEnd, { passive: true });
   }
 
   /**
-   * Sets or clears the Time-Travel Preview timestamp and immediately refreshes the board.
-   * @param {number | null} epochMs
-   * @param {string} [activePresetId]
+   * Switches the active top-level view tab between 'countdown' and 'timeline'.
+   * @param {'countdown' | 'timeline'} viewName
    */
-  setPreviewTimestamp(epochMs, activePresetId = '') {
-    if (!this.#tripConfig) return;
-    this.previewEpochMs = epochMs;
+  switchView(viewName) {
+    this.activeView = viewName;
+    if (this.dom.viewCountdown) this.dom.viewCountdown.hidden = viewName !== 'countdown';
+    if (this.dom.viewTimeline) this.dom.viewTimeline.hidden = viewName !== 'timeline';
+    this.dom.navBtnCountdown?.classList.toggle('is-active', viewName === 'countdown');
+    this.dom.navBtnTimeline?.classList.toggle('is-active', viewName === 'timeline');
+  }
 
-    if (this.dom.presetChipsRow) {
-      const chips = this.dom.presetChipsRow.querySelectorAll('.preset-chip');
-      chips.forEach((chip) => {
-        const id = /** @type {HTMLElement} */ (chip).dataset.presetId;
-        const isActive = epochMs === null ? id === 'live' : id === activePresetId;
-        chip.classList.toggle('is-active', isActive);
-      });
-    }
-
-    if (epochMs === null) {
-      if (this.dom.previewBanner) this.dom.previewBanner.hidden = true;
-      if (this.dom.sliderDateReadout) this.dom.sliderDateReadout.textContent = 'Live Now';
-    } else {
-      const homeTz = getCountryInfo(this.#tripConfig.homeCountryCode || 'UTC').timeZone;
-      const zoned = getZonedDateParts(epochMs, homeTz);
-      const formatted = formatDisplayDate(zoned.dateStr);
-      if (this.dom.previewBanner) this.dom.previewBanner.hidden = false;
-      if (this.dom.previewBannerDate) this.dom.previewBannerDate.textContent = formatted;
-      if (this.dom.sliderDateReadout) this.dom.sliderDateReadout.textContent = formatted;
-      if (this.dom.timeTravelSlider) this.dom.timeTravelSlider.value = String(epochMs);
-    }
-
-    this.tick(true);
-    this.syncEditFormWithState();
+  updateProfileSelectorUI() {
+    this.dom.segBtnPrimary?.classList.toggle('is-active', this.activeProfile === 'primary');
+    this.dom.segBtnSecondary?.classList.toggle('is-active', this.activeProfile === 'secondary');
   }
 
   getEffectiveNowMs() {
-    return this.previewEpochMs !== null ? this.previewEpochMs : Date.now();
+    return Date.now();
   }
 
   openEditSheet() {
@@ -703,22 +732,27 @@ export class CountdownBoardApp {
   closeEditSheet() {
     this.dom.editSheetBackdrop?.classList.remove('is-open');
     this.dom.editBottomSheet?.classList.remove('is-open');
+    if (this.dom.editBottomSheet) {
+      this.dom.editBottomSheet.style.transform = '';
+      this.dom.editBottomSheet.style.transition = '';
+    }
   }
 
   syncEditFormWithState() {
     if (!this.#tripConfig) return;
     const state = evaluateBoardState(this.#tripConfig, this.liveState, this.getEffectiveNowMs());
-    if (this.dom.editPrimaryCountry) {
-      this.dom.editPrimaryCountry.value = state.dualStatus.primary.countryCode;
+    const partnerStatus = this.activeProfile === 'secondary'
+      ? state.dualStatus.secondary
+      : state.dualStatus.primary;
+
+    if (this.dom.editCurrentCountryLabel) {
+      this.dom.editCurrentCountryLabel.textContent = `${partnerStatus.displayName}'s Current Country`;
     }
-    if (this.dom.editPrimaryNote) {
-      this.dom.editPrimaryNote.value = state.dualStatus.primary.cityNote || '';
+    if (this.dom.editCurrentCountry) {
+      this.dom.editCurrentCountry.value = partnerStatus.countryCode;
     }
-    if (this.dom.editSecondaryCountry) {
-      this.dom.editSecondaryCountry.value = state.dualStatus.secondary.countryCode;
-    }
-    if (this.dom.editSecondaryNote) {
-      this.dom.editSecondaryNote.value = state.dualStatus.secondary.cityNote || '';
+    if (this.dom.editCurrentNote) {
+      this.dom.editCurrentNote.value = partnerStatus.cityNote || '';
     }
   }
 

@@ -235,3 +235,40 @@ test('Security Audit: Zero personal names, itinerary dates, or token.txt exist i
     }
   }
 });
+
+test('Integration: index.html contains split two-view panels, bottom nav, dedicated tz bridge, and neutral gate copy', () => {
+  const html = fs.readFileSync(path.join(ROOT_DIR, 'index.html'), 'utf8');
+
+  // Neutral gate overlay branding (no "encrypted vault" technical jargon)
+  assert.ok(html.includes('<h1 class="vault-title" id="vault-title">Trip Countdown</h1>'));
+  assert.ok(html.includes('<p class="vault-subtitle" id="vault-subtitle">Enter password to continue</p>'));
+  assert.ok(html.includes('<button type="submit" class="vault-unlock-btn" id="vault-unlock-btn">Open ✨</button>'));
+  assert.ok(html.includes('<button type="button" class="preset-chip" id="lock-device-btn">🔒 Lock App</button>'));
+  assert.equal(html.includes('Encrypted Trip Board'), false);
+  assert.equal(html.includes('decrypt photos &amp; live itinerary'), false);
+
+  // Two-view panels and bottom navigation
+  assert.ok(html.includes('id="view-countdown"'));
+  assert.ok(html.includes('id="view-timeline"'));
+  assert.ok(html.includes('id="bottom-nav"'));
+  assert.ok(html.includes('id="nav-btn-countdown"'));
+  assert.ok(html.includes('id="nav-btn-timeline"'));
+
+  // Dedicated non-overlapping tz-bridge container
+  assert.ok(html.includes('<div class="tz-bridge-container">'));
+  assert.ok(html.includes('<div class="tz-bridge-pill numeric-lock" id="tz-bridge-pill" dir="ltr"></div>'));
+
+  // Profile-aware status update controls
+  assert.ok(html.includes('id="profile-segmented-control"'));
+  assert.ok(html.includes('id="seg-btn-primary"'));
+  assert.ok(html.includes('id="seg-btn-secondary"'));
+  assert.ok(html.includes('id="edit-current-country"'));
+  assert.ok(html.includes('id="edit-current-note"'));
+
+  // Time-travel preview slider and banner removed
+  assert.equal(html.includes('id="time-travel-slider"'), false);
+  assert.equal(html.includes('id="preview-banner"'), false);
+
+  // Bottom sheet drag handle wrapper
+  assert.ok(html.includes('id="sheet-handle-wrapper"'));
+});

@@ -21,18 +21,18 @@
     <img id="ambient-backdrop-img" class="ambient-photo-aura" alt="" hidden />
   </div>
 
-  <!-- 2. Cryptographic Unlock Gate Overlay (AES-256-GCM Vault Unlock) -->
+  <!-- 2. Cryptographic Unlock Gate Overlay -->
   <div class="vault-lock-overlay" id="vault-lock-overlay" role="dialog" aria-modal="true" aria-labelledby="vault-title">
     <div class="vault-card" id="vault-card">
-      <div class="vault-icon-badge" aria-hidden="true">🔒</div>
-      <h1 class="vault-title" id="vault-title">Encrypted Trip Board</h1>
-      <p class="vault-subtitle" id="vault-subtitle">Enter the shared password to decrypt photos &amp; live itinerary</p>
+      <div class="vault-icon-badge" aria-hidden="true">✈️</div>
+      <h1 class="vault-title" id="vault-title">Trip Countdown</h1>
+      <p class="vault-subtitle" id="vault-subtitle">Enter password to continue</p>
       <form class="vault-form" id="vault-unlock-form" autocomplete="off">
         <input
           type="password"
           id="vault-password-input"
           class="vault-password-input"
-          placeholder="Shared password…"
+          placeholder="Password…"
           required
           autocomplete="current-password"
         />
@@ -41,182 +41,193 @@
           <span>Remember this phone</span>
         </label>
         <div class="vault-error-msg" id="vault-error-msg" role="alert"></div>
-        <button type="submit" class="vault-unlock-btn" id="vault-unlock-btn">Unlock Vault ✨</button>
+        <button type="submit" class="vault-unlock-btn" id="vault-unlock-btn">Open ✨</button>
       </form>
     </div>
   </div>
 
   <!-- 3. Main Board Container (Unpopulated Skeleton Until Decryption Succeeds) -->
   <main class="board-container" id="board-container" hidden>
-    <!-- Time-Travel Preview Active Floating Banner -->
-    <div class="preview-banner" id="preview-banner" hidden>
-      <span class="preview-banner-text">
-        <span>⏱️ Previewing</span>
-        <span class="numeric-lock" id="preview-banner-date" dir="ltr"></span>
-      </span>
-      <button type="button" class="preview-reset-btn" id="preview-reset-btn">Reset to Live</button>
+    <!-- View 1: Main Countdown & Status -->
+    <div class="view-panel is-active" id="view-countdown">
+      <!-- Section 1: Ambient Hero Section -->
+      <section class="hero-section" aria-label="Countdown Overview">
+        <!-- Live Counter Pill -->
+        <div class="days-together-pill" id="days-together-pill">
+          <span>💕</span>
+          <span class="numeric-lock" id="relationship-days-primary" dir="ltr"></span>
+          <span class="pill-divider">•</span>
+          <span class="pill-secondary numeric-lock" id="relationship-days-breakdown" dir="ltr"></span>
+        </div>
+
+        <!-- Swipeable 3D Photo Card Stack -->
+        <div class="photo-stack-wrapper" id="photo-stack-container"></div>
+
+        <!-- Primary State & Countdown Card -->
+        <div class="countdown-card" id="countdown-card">
+          <div class="phase-banner-pill" id="phase-banner-pill" dir="auto"></div>
+
+          <!-- Apart / Pre-Trip Live D:H:M:S Countdown View -->
+          <div id="countdown-apart-view" style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px;">
+            <div class="countdown-header">
+              <span class="countdown-target-label" id="countdown-target-label"></span>
+              <h2 class="countdown-target-title" id="countdown-target-title" dir="auto"></h2>
+              <span class="countdown-target-date numeric-lock" id="countdown-target-date" dir="ltr"></span>
+            </div>
+
+            <div class="countdown-grid numeric-lock" dir="ltr" role="timer" aria-live="polite">
+              <div class="countdown-unit">
+                <span class="countdown-value" id="cd-days">--</span>
+                <span class="countdown-label">Days</span>
+              </div>
+              <div class="countdown-unit">
+                <span class="countdown-value" id="cd-hours">--</span>
+                <span class="countdown-label">Hours</span>
+              </div>
+              <div class="countdown-unit">
+                <span class="countdown-value" id="cd-minutes">--</span>
+                <span class="countdown-label">Mins</span>
+              </div>
+              <div class="countdown-unit">
+                <span class="countdown-value" id="cd-seconds">--</span>
+                <span class="countdown-label">Secs</span>
+              </div>
+            </div>
+
+            <!-- Separation Progress Bar (shown when Apart) -->
+            <div class="separation-progress-container" id="separation-progress-container" hidden>
+              <div class="separation-progress-meta">
+                <span id="separation-progress-label">Separation progress</span>
+                <span class="numeric-lock" id="separation-progress-pct" dir="ltr"></span>
+              </div>
+              <div class="separation-progress-bar">
+                <div class="separation-progress-fill" id="separation-progress-fill" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Together Celebration View (shown when Reunion is active) -->
+          <div class="together-celebration-card" id="countdown-together-view" hidden>
+            <span class="active-leg-badge" id="together-leg-badge"></span>
+            <h2 class="together-headline" id="together-headline" dir="auto"></h2>
+            <p class="together-subtext" id="together-subtext" dir="auto"></p>
+            <div class="separation-progress-container">
+              <div class="separation-progress-meta">
+                <span id="together-progress-label">Chapter progress</span>
+                <span class="numeric-lock" id="together-progress-day" dir="ltr"></span>
+              </div>
+              <div class="separation-progress-bar">
+                <div class="separation-progress-fill" id="together-progress-fill" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Secondary Sub-Milestone Banner -->
+          <div class="sub-milestone-banner" id="sub-milestone-banner" dir="auto" hidden></div>
+        </div>
+      </section>
+
+      <!-- Section 2: "Where We Are Now" Dual Status & Time-Zone Bridge -->
+      <section class="status-section" aria-label="Where We Are Now">
+        <div class="section-header-row">
+          <h3 class="section-title">Where We Are Now</h3>
+          <span class="tz-code-label" id="auto-sync-indicator" hidden>✨ Synced to Reunion</span>
+        </div>
+
+        <div class="dual-status-grid">
+          <!-- Partner A Status Card -->
+          <article class="person-status-card" data-person="primary" id="status-card-primary">
+            <div class="person-card-header">
+              <span class="person-name-tag">
+                <span class="person-dot"></span>
+                <span id="primary-name-label"></span>
+              </span>
+            </div>
+            <div class="person-country-row">
+              <span class="person-flag" id="primary-flag"></span>
+              <span class="person-country" id="primary-country"></span>
+            </div>
+            <div class="city-note" id="primary-city-note" dir="auto"></div>
+            <div class="person-clock-row">
+              <span class="local-clock numeric-lock" id="primary-clock" dir="ltr"></span>
+              <span class="tz-code-label numeric-lock" id="primary-tz-offset" dir="ltr"></span>
+            </div>
+          </article>
+
+          <!-- Partner B Status Card -->
+          <article class="person-status-card" data-person="secondary" id="status-card-secondary">
+            <div class="person-card-header">
+              <span class="person-name-tag">
+                <span class="person-dot"></span>
+                <span id="secondary-name-label"></span>
+              </span>
+            </div>
+            <div class="person-country-row">
+              <span class="person-flag" id="secondary-flag"></span>
+              <span class="person-country" id="secondary-country"></span>
+            </div>
+            <div class="city-note" id="secondary-city-note" dir="auto"></div>
+            <div class="person-clock-row">
+              <span class="local-clock numeric-lock" id="secondary-clock" dir="ltr"></span>
+              <span class="tz-code-label numeric-lock" id="secondary-tz-offset" dir="ltr"></span>
+            </div>
+          </article>
+        </div>
+
+        <!-- Dedicated Non-Overlapping Time-Zone Bridge Pill -->
+        <div class="tz-bridge-container">
+          <div class="tz-bridge-pill numeric-lock" id="tz-bridge-pill" dir="ltr"></div>
+        </div>
+      </section>
     </div>
 
-    <!-- Section 1: Ambient Hero Section -->
-    <section class="hero-section" aria-label="Countdown Overview">
-      <!-- Live Counter Pill -->
-      <div class="days-together-pill" id="days-together-pill">
-        <span>💕</span>
-        <span class="numeric-lock" id="relationship-days-primary" dir="ltr"></span>
-        <span class="pill-divider">•</span>
-        <span class="pill-secondary numeric-lock" id="relationship-days-breakdown" dir="ltr"></span>
-      </div>
-
-      <!-- Swipeable 3D Photo Card Stack -->
-      <div class="photo-stack-wrapper" id="photo-stack-container"></div>
-
-      <!-- Primary State & Countdown Card -->
-      <div class="countdown-card" id="countdown-card">
-        <div class="phase-banner-pill" id="phase-banner-pill" dir="auto"></div>
-
-        <!-- Apart / Pre-Trip Live D:H:M:S Countdown View -->
-        <div id="countdown-apart-view" style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px;">
-          <div class="countdown-header">
-            <span class="countdown-target-label" id="countdown-target-label"></span>
-            <h2 class="countdown-target-title" id="countdown-target-title" dir="auto"></h2>
-            <span class="countdown-target-date numeric-lock" id="countdown-target-date" dir="ltr"></span>
-          </div>
-
-          <div class="countdown-grid numeric-lock" dir="ltr" role="timer" aria-live="polite">
-            <div class="countdown-unit">
-              <span class="countdown-value" id="cd-days">--</span>
-              <span class="countdown-label">Days</span>
-            </div>
-            <div class="countdown-unit">
-              <span class="countdown-value" id="cd-hours">--</span>
-              <span class="countdown-label">Hours</span>
-            </div>
-            <div class="countdown-unit">
-              <span class="countdown-value" id="cd-minutes">--</span>
-              <span class="countdown-label">Mins</span>
-            </div>
-            <div class="countdown-unit">
-              <span class="countdown-value" id="cd-seconds">--</span>
-              <span class="countdown-label">Secs</span>
-            </div>
-          </div>
-
-          <!-- Separation Progress Bar (shown when Apart) -->
-          <div class="separation-progress-container" id="separation-progress-container" hidden>
-            <div class="separation-progress-meta">
-              <span id="separation-progress-label">Separation progress</span>
-              <span class="numeric-lock" id="separation-progress-pct" dir="ltr"></span>
-            </div>
-            <div class="separation-progress-bar">
-              <div class="separation-progress-fill" id="separation-progress-fill" style="width: 0%;"></div>
-            </div>
-          </div>
+    <!-- View 2: Journey & Milestone Timeline -->
+    <div class="view-panel" id="view-timeline" hidden>
+      <!-- Section 3: Split-and-Merge Chronological Timeline -->
+      <section class="timeline-section" aria-label="Journey Timeline">
+        <div class="section-header-row">
+          <h3 class="section-title">Journey &amp; Reunion Timeline</h3>
         </div>
 
-        <!-- Together Celebration View (shown when Reunion is active) -->
-        <div class="together-celebration-card" id="countdown-together-view" hidden>
-          <span class="active-leg-badge" id="together-leg-badge"></span>
-          <h2 class="together-headline" id="together-headline" dir="auto"></h2>
-          <p class="together-subtext" id="together-subtext" dir="auto"></p>
-          <div class="separation-progress-container">
-            <div class="separation-progress-meta">
-              <span id="together-progress-label">Chapter progress</span>
-              <span class="numeric-lock" id="together-progress-day" dir="ltr"></span>
-            </div>
-            <div class="separation-progress-bar">
-              <div class="separation-progress-fill" id="together-progress-fill" style="width: 0%;"></div>
-            </div>
-          </div>
+        <div class="timeline-stats-bar">
+          <div class="trip-stats-pill" id="trip-stats-pill"></div>
+          <button
+            type="button"
+            class="past-chapters-toggle"
+            id="past-chapters-toggle"
+            aria-expanded="false"
+            hidden
+          ></button>
         </div>
 
-        <!-- Secondary Sub-Milestone Banner -->
-        <div class="sub-milestone-banner" id="sub-milestone-banner" dir="auto" hidden></div>
-      </div>
-    </section>
+        <!-- Collapsible Past Chapters Drawer -->
+        <div class="past-chapters-drawer" id="past-chapters-drawer" hidden></div>
 
-    <!-- Section 2: "Where We Are Now" Dual Status & Time-Zone Bridge -->
-    <section class="status-section" aria-label="Where We Are Now">
-      <div class="section-header-row">
-        <h3 class="section-title">Where We Are Now</h3>
-        <span class="tz-code-label" id="auto-sync-indicator" hidden>✨ Synced to Reunion</span>
-      </div>
-
-      <div class="dual-status-grid">
-        <!-- Partner A Status Card -->
-        <article class="person-status-card" data-person="primary" id="status-card-primary">
-          <div class="person-card-header">
-            <span class="person-name-tag">
-              <span class="person-dot"></span>
-              <span id="primary-name-label"></span>
-            </span>
-          </div>
-          <div class="person-country-row">
-            <span class="person-flag" id="primary-flag"></span>
-            <span class="person-country" id="primary-country"></span>
-          </div>
-          <div class="city-note" id="primary-city-note" dir="auto"></div>
-          <div class="person-clock-row">
-            <span class="local-clock numeric-lock" id="primary-clock" dir="ltr"></span>
-            <span class="tz-code-label numeric-lock" id="primary-tz-offset" dir="ltr"></span>
-          </div>
-        </article>
-
-        <!-- Overlapping Time-Zone Bridge Pill -->
-        <div class="tz-bridge-pill numeric-lock" id="tz-bridge-pill" dir="ltr"></div>
-
-        <!-- Partner B Status Card -->
-        <article class="person-status-card" data-person="secondary" id="status-card-secondary">
-          <div class="person-card-header">
-            <span class="person-name-tag">
-              <span class="person-dot"></span>
-              <span id="secondary-name-label"></span>
-            </span>
-          </div>
-          <div class="person-country-row">
-            <span class="person-flag" id="secondary-flag"></span>
-            <span class="person-country" id="secondary-country"></span>
-          </div>
-          <div class="city-note" id="secondary-city-note" dir="auto"></div>
-          <div class="person-clock-row">
-            <span class="local-clock numeric-lock" id="secondary-clock" dir="ltr"></span>
-            <span class="tz-code-label numeric-lock" id="secondary-tz-offset" dir="ltr"></span>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <!-- Section 3: Split-and-Merge Chronological Timeline -->
-    <section class="timeline-section" aria-label="Journey Timeline">
-      <div class="section-header-row">
-        <h3 class="section-title">Journey &amp; Reunion Timeline</h3>
-      </div>
-
-      <div class="timeline-stats-bar">
-        <div class="trip-stats-pill" id="trip-stats-pill"></div>
-        <button
-          type="button"
-          class="past-chapters-toggle"
-          id="past-chapters-toggle"
-          aria-expanded="false"
-          hidden
-        ></button>
-      </div>
-
-      <!-- Collapsible Past Chapters Drawer -->
-      <div class="past-chapters-drawer" id="past-chapters-drawer" hidden></div>
-
-      <!-- Active & Upcoming Split-and-Merge Track -->
-      <div class="timeline-track-container" id="timeline-upcoming-track"></div>
-    </section>
+        <!-- Active & Upcoming Track -->
+        <div class="timeline-track-container" id="timeline-upcoming-track"></div>
+      </section>
+    </div>
   </main>
 
   <!-- 4. Floating Mobile Edit Mode Action Button -->
-  <button type="button" class="fab-edit-btn" id="fab-edit-btn" aria-label="Open Update & Preview Panel" hidden>
+  <button type="button" class="fab-edit-btn" id="fab-edit-btn" aria-label="Open Update Panel" hidden>
     <span>✏️</span>
     <span>Update</span>
   </button>
 
-  <!-- 5. Mobile Edit & Time-Travel Bottom Sheet -->
+  <!-- 5. App Bottom Navigation Bar -->
+  <nav class="bottom-nav" id="bottom-nav" hidden aria-label="Main Navigation">
+    <button type="button" class="bottom-nav-item is-active" id="nav-btn-countdown" data-view="countdown">
+      <span class="bottom-nav-icon" aria-hidden="true">⏳</span>
+      <span class="bottom-nav-label">Countdown</span>
+    </button>
+    <button type="button" class="bottom-nav-item" id="nav-btn-timeline" data-view="timeline">
+      <span class="bottom-nav-icon" aria-hidden="true">🗺️</span>
+      <span class="bottom-nav-label">Timeline</span>
+    </button>
+  </nav>
+
+  <!-- 6. Mobile Edit Bottom Sheet -->
   <div class="edit-sheet-backdrop" id="edit-sheet-backdrop"></div>
   <aside
     class="edit-bottom-sheet"
@@ -226,61 +237,46 @@
     aria-labelledby="edit-sheet-title"
     hidden
   >
-    <div class="sheet-handle" aria-hidden="true"></div>
-    <div class="sheet-header">
-      <h2 class="sheet-title" id="edit-sheet-title">Update Board &amp; Preview</h2>
+    <div class="sheet-handle-wrapper" id="sheet-handle-wrapper">
+      <div class="sheet-handle" aria-hidden="true"></div>
+    </div>
+    <div class="sheet-header" id="sheet-header">
+      <h2 class="sheet-title" id="edit-sheet-title">Update Board</h2>
       <button type="button" class="sheet-close-btn" id="edit-sheet-close-btn" aria-label="Close panel">✕</button>
     </div>
 
-    <!-- A. Time-Travel Preview Slider -->
-    <div class="edit-section">
-      <div class="edit-section-title">
-        <span>⏱️ Time-Travel Preview</span>
-        <span class="numeric-lock" id="slider-date-readout" dir="ltr">Live Now</span>
-      </div>
-      <input
-        type="range"
-        id="time-travel-slider"
-        class="time-travel-slider"
-        min="0"
-        max="100"
-        step="1"
-      />
-      <div class="preset-chips-row" id="preset-chips-row"></div>
-    </div>
-
-    <!-- B. Quick Status Update -->
+    <!-- Quick Status Update -->
     <form class="edit-section" id="status-update-form">
       <div class="edit-section-title">
         <span>📍 Quick Status Update</span>
         <span class="sync-status-pill" id="sync-status-pill" data-sync-state="synced">Ready</span>
       </div>
 
-      <div class="status-edit-grid">
-        <!-- Partner A Controls -->
-        <div class="form-group">
-          <label class="form-label" id="edit-primary-country-label" for="edit-primary-country">Partner 1 Country</label>
-          <select class="form-select" id="edit-primary-country"></select>
-          <label class="form-label" id="edit-primary-note-label" for="edit-primary-note">City / Vibe Note (Optional)</label>
-          <input
-            type="text"
-            class="form-input"
-            id="edit-primary-note"
-            dir="auto"
-            placeholder="Current city or note…"
-            maxlength="60"
-          />
+      <!-- Device Profile Selector -->
+      <div class="profile-selector-group">
+        <label class="form-label" id="profile-selector-label">Who is updating on this phone?</label>
+        <div class="profile-segmented-control" id="profile-segmented-control" role="group" aria-labelledby="profile-selector-label">
+          <button type="button" class="profile-seg-btn is-active" data-profile="primary" id="seg-btn-primary">
+            Partner 1
+          </button>
+          <button type="button" class="profile-seg-btn" data-profile="secondary" id="seg-btn-secondary">
+            Partner 2
+          </button>
         </div>
+      </div>
 
-        <!-- Partner B Controls -->
+      <!-- Focused Single Person Status Edit -->
+      <div class="status-edit-single">
         <div class="form-group">
-          <label class="form-label" id="edit-secondary-country-label" for="edit-secondary-country">Partner 2 Country</label>
-          <select class="form-select" id="edit-secondary-country"></select>
-          <label class="form-label" id="edit-secondary-note-label" for="edit-secondary-note">City / Vibe Note (Optional)</label>
+          <label class="form-label" id="edit-current-country-label" for="edit-current-country">Current Country</label>
+          <select class="form-select" id="edit-current-country"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" id="edit-current-note-label" for="edit-current-note">City / Vibe Note (Optional)</label>
           <input
             type="text"
             class="form-input"
-            id="edit-secondary-note"
+            id="edit-current-note"
             dir="auto"
             placeholder="Current city or note…"
             maxlength="60"
@@ -296,12 +292,12 @@
           class="preset-chip"
           style="flex: 1; padding-block: 12px;"
         >
-          Reset to Auto Schedule
+          Reset to Auto
         </button>
       </div>
     </form>
 
-    <!-- C. Add Custom Milestone -->
+    <!-- Add Custom Milestone -->
     <form class="edit-section" id="add-milestone-form">
       <div class="edit-section-title">
         <span>✨ Add Milestone or Flight</span>
@@ -346,9 +342,9 @@
       <button type="submit" class="btn-primary">Add to Timeline ➕</button>
     </form>
 
-    <!-- D. Device Lock / Reset -->
+    <!-- Device Lock / Reset -->
     <div style="display: flex; justify-content: center; padding-block-start: 4px;">
-      <button type="button" class="preset-chip" id="lock-device-btn">🔒 Lock Vault on This Phone</button>
+      <button type="button" class="preset-chip" id="lock-device-btn">🔒 Lock App</button>
     </div>
   </aside>
 

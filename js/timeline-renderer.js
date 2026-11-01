@@ -17,46 +17,6 @@ export function isReunionChapter(item) {
 }
 
 /**
- * Creates an SVG cubic-bezier split or merge connector between the parallel rails (25% / 75%) and merged center (50%).
- * @param {'merge'|'split'} direction
- * @returns {SVGSVGElement}
- */
-function createRailConnectorSvg(direction) {
-  const svgNs = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(svgNs, 'svg');
-  svg.setAttribute('class', 'timeline-svg-connector');
-  svg.setAttribute('viewBox', '0 0 400 44');
-  svg.setAttribute('preserveAspectRatio', 'none');
-  svg.setAttribute('aria-hidden', 'true');
-
-  const primaryPath = document.createElementNS(svgNs, 'path');
-  primaryPath.setAttribute('class', 'connector-path-primary');
-
-  const secondaryPath = document.createElementNS(svgNs, 'path');
-  secondaryPath.setAttribute('class', 'connector-path-secondary');
-
-  const centerDot = document.createElementNS(svgNs, 'circle');
-  centerDot.setAttribute('class', 'connector-node-dot');
-  centerDot.setAttribute('cx', '200');
-  centerDot.setAttribute('r', '5');
-
-  if (direction === 'merge') {
-    primaryPath.setAttribute('d', 'M 100 0 C 100 24, 200 20, 200 40');
-    secondaryPath.setAttribute('d', 'M 300 0 C 300 24, 200 20, 200 40');
-    centerDot.setAttribute('cy', '39');
-  } else {
-    primaryPath.setAttribute('d', 'M 200 4 C 200 24, 100 20, 100 44');
-    secondaryPath.setAttribute('d', 'M 200 4 C 200 24, 300 20, 300 44');
-    centerDot.setAttribute('cy', '5');
-  }
-
-  svg.appendChild(primaryPath);
-  svg.appendChild(secondaryPath);
-  svg.appendChild(centerDot);
-  return svg;
-}
-
-/**
  * Resolves the slot ('primary' | 'secondary' | 'both') and display label for a milestone's `person` field.
  * @param {string} personKey
  * @param {import('./config.js').EvaluatedBoardState} boardState
@@ -280,39 +240,19 @@ function createReunionCardElement(reunion, boardState) {
 }
 
 /**
- * Renders a list of chronological items into split parallel segments and merged reunion cards.
+ * Renders a list of chronological items along the sleek unified timeline track.
  * @param {Array<import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter>} items
  * @param {import('./config.js').EvaluatedBoardState} boardState
  * @param {HTMLElement} targetContainer
- * @param {{ includeSvgConnectors?: boolean }} [options]
  */
-function renderChronologicalSequence(items, boardState, targetContainer, options = { includeSvgConnectors: true }) {
+function renderChronologicalSequence(items, boardState, targetContainer) {
   targetContainer.innerHTML = '';
-  const includeSvg = options.includeSvgConnectors ?? true;
 
-  let currentSplitSegment = null;
-
-  items.forEach((item, index) => {
+  items.forEach((item) => {
     if (isReunionChapter(item)) {
-      if (currentSplitSegment && includeSvg) {
-        targetContainer.appendChild(createRailConnectorSvg('merge'));
-      }
-      currentSplitSegment = null;
-
-      const reunionCard = createReunionCardElement(item, boardState);
-      targetContainer.appendChild(reunionCard);
-
-      const hasMoreItems = index < items.length - 1;
-      if (hasMoreItems && includeSvg) {
-        targetContainer.appendChild(createRailConnectorSvg('split'));
-      }
+      targetContainer.appendChild(createReunionCardElement(item, boardState));
     } else {
-      if (!currentSplitSegment) {
-        currentSplitSegment = document.createElement('div');
-        currentSplitSegment.className = 'timeline-split-segment';
-        targetContainer.appendChild(currentSplitSegment);
-      }
-      currentSplitSegment.appendChild(createMilestoneRowElement(item, boardState));
+      targetContainer.appendChild(createMilestoneRowElement(item, boardState));
     }
   });
 }
@@ -393,12 +333,12 @@ export class TimelineRenderer {
         const arrow = this.isPastDrawerOpen ? '▴' : '▾';
         this.pastToggleBtn.innerHTML = `Completed Chapters (<span class="numeric-lock" dir="ltr">${pastItems.length}</span>) ${arrow}`;
         this.syncPastDrawerVisibility();
-        renderChronologicalSequence(pastItems, boardState, this.pastDrawerEl, { includeSvgConnectors: false });
+        renderChronologicalSequence(pastItems, boardState, this.pastDrawerEl);
       }
     }
 
     if (this.upcomingTrackEl) {
-      renderChronologicalSequence(upcomingItems, boardState, this.upcomingTrackEl, { includeSvgConnectors: true });
+      renderChronologicalSequence(upcomingItems, boardState, this.upcomingTrackEl);
     }
   }
 }
