@@ -490,6 +490,69 @@ export function extractLuminousPalette(imageSource) {
 }
 
 /**
+ * Creates an elegant calendar-sheet date badge with separate "pages" for day, month, and year.
+ * If dateLabel does not match a standard calendar date, returns a fallback single pill.
+ * @param {string} dateLabel
+ * @returns {HTMLElement}
+ */
+export function createPhotoDateElement(dateLabel) {
+  const dmyMatch = dateLabel.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  const ymdMatch = dateLabel.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+
+  let day = '';
+  let month = '';
+  let year = '';
+
+  if (dmyMatch) {
+    day = dmyMatch[1].padStart(2, '0');
+    month = dmyMatch[2].padStart(2, '0');
+    year = dmyMatch[3];
+  } else if (ymdMatch) {
+    year = ymdMatch[1];
+    month = ymdMatch[2].padStart(2, '0');
+    day = ymdMatch[3].padStart(2, '0');
+  }
+
+  if (!day || !month || !year) {
+    const singlePill = document.createElement('div');
+    singlePill.className = 'photo-date-pill numeric-lock';
+    singlePill.setAttribute('dir', 'ltr');
+    singlePill.textContent = dateLabel;
+    return singlePill;
+  }
+
+  const pagesContainer = document.createElement('div');
+  pagesContainer.className = 'photo-date-pages numeric-lock';
+  pagesContainer.setAttribute('dir', 'ltr');
+  pagesContainer.setAttribute('aria-label', `Date: ${day}-${month}-${year}`);
+
+  const units = [
+    { label: 'DAY', val: day, cls: 'date-page-day' },
+    { label: 'MONTH', val: month, cls: 'date-page-month' },
+    { label: 'YEAR', val: year, cls: 'date-page-year' }
+  ];
+
+  for (const unit of units) {
+    const page = document.createElement('div');
+    page.className = `date-page ${unit.cls}`;
+
+    const header = document.createElement('span');
+    header.className = 'date-page-header';
+    header.textContent = unit.label;
+
+    const value = document.createElement('span');
+    value.className = 'date-page-value';
+    value.textContent = unit.val;
+
+    page.appendChild(header);
+    page.appendChild(value);
+    pagesContainer.appendChild(page);
+  }
+
+  return pagesContainer;
+}
+
+/**
  * Interactive 3D Photo Card Stack Controller.
  * Manages touch/pointer drag gestures, tap-to-sift, keyboard navigation,
  * 4500ms auto-rotation, and dynamic `:root` ambient color dispersion.
@@ -676,11 +739,7 @@ export class PhotoStackController {
       overlay.className = 'photo-card-overlay';
 
       if (photo.dateLabel) {
-        const datePill = document.createElement('div');
-        datePill.className = 'photo-date-pill numeric-lock';
-        datePill.setAttribute('dir', 'ltr');
-        datePill.textContent = photo.dateLabel;
-        overlay.appendChild(datePill);
+        overlay.appendChild(createPhotoDateElement(photo.dateLabel));
       }
 
       card.appendChild(img);

@@ -17,40 +17,55 @@ export function isReunionChapter(item) {
 }
 
 /**
- * Resolves the slot ('primary' | 'secondary' | 'both') and display label for a milestone's `person` field.
+ * Resolves the slot ('primary' | 'secondary' | 'both'), display label, and avatar icon for a milestone's `person` field.
  * @param {string} personKey
  * @param {import('./config.js').EvaluatedBoardState} boardState
- * @returns {{ slot: 'primary'|'secondary'|'both', label: string }}
+ * @returns {{ slot: 'primary'|'secondary'|'both', label: string, icon: string }}
  */
-function resolveMilestonePersonMeta(personKey, boardState) {
+export function resolveMilestonePersonMeta(personKey, boardState) {
   const primary = boardState.dualStatus?.primary;
   const secondary = boardState.dualStatus?.secondary;
 
   if (primary && (personKey === primary.person || personKey === 'primary')) {
-    return { slot: 'primary', label: primary.displayName };
+    return { slot: 'primary', label: primary.displayName, icon: '🌸' };
   }
   if (secondary && (personKey === secondary.person || personKey === 'secondary')) {
-    return { slot: 'secondary', label: secondary.displayName };
+    return { slot: 'secondary', label: secondary.displayName, icon: '🌊' };
   }
-  return { slot: 'both', label: 'Together' };
+  return { slot: 'both', label: 'Together', icon: '💕' };
 }
 
 /**
  * Renders a single MilestoneEvent card anchored to Primary, Secondary, or Both.
  * @param {import('./config.js').MilestoneEvent} milestone
  * @param {import('./config.js').EvaluatedBoardState} boardState
+ * @param {((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null} [onEditItem]
  * @returns {HTMLElement}
  */
-function createMilestoneRowElement(milestone, boardState) {
-  const { slot, label } = resolveMilestonePersonMeta(milestone.person || 'both', boardState);
+export function createMilestoneRowElement(milestone, boardState, onEditItem = null) {
+  const { slot, label, icon } = resolveMilestonePersonMeta(milestone.person || 'both', boardState);
   const row = document.createElement('div');
   row.className = 'milestone-row';
   row.dataset.person = slot;
 
   const card = document.createElement('article');
-  card.className = 'milestone-card';
+  card.className = 'milestone-card is-interactive';
   card.dataset.person = slot;
   card.dataset.category = milestone.category || 'custom';
+  card.dataset.itemId = milestone.id;
+  card.setAttribute('role', 'button');
+  card.setAttribute('tabindex', '0');
+  card.setAttribute('aria-label', `Edit milestone: ${milestone.title}`);
+
+  if (onEditItem) {
+    card.addEventListener('click', () => onEditItem(milestone));
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onEditItem(milestone);
+      }
+    });
+  }
 
   const emojiBadge = document.createElement('div');
   emojiBadge.className = 'milestone-emoji-badge';
@@ -62,18 +77,28 @@ function createMilestoneRowElement(milestone, boardState) {
   const metaRow = document.createElement('div');
   metaRow.className = 'milestone-meta-row';
 
+  const dateCol = document.createElement('div');
+  dateCol.className = 'milestone-date-col';
+
   const dateSpan = document.createElement('span');
   dateSpan.className = 'milestone-date numeric-lock';
   dateSpan.setAttribute('dir', 'ltr');
   dateSpan.textContent = formatDisplayDate(milestone.date);
+  dateCol.appendChild(dateSpan);
+
+  const countryInfo = milestone.countryCode ? getCountryInfo(milestone.countryCode) : null;
+  if (countryInfo) {
+    const countryBadge = document.createElement('span');
+    countryBadge.className = 'milestone-country-badge';
+    countryBadge.textContent = `${countryInfo.flag} ${countryInfo.name}`;
+    dateCol.appendChild(countryBadge);
+  }
 
   const personTag = document.createElement('span');
   personTag.className = 'milestone-person-tag';
-  const countryInfo = milestone.countryCode ? getCountryInfo(milestone.countryCode) : null;
-  const flagSuffix = countryInfo ? ` ${countryInfo.flag}` : '';
-  personTag.textContent = `${label}${flagSuffix}`;
+  personTag.textContent = `${icon} ${label}`;
 
-  metaRow.appendChild(dateSpan);
+  metaRow.appendChild(dateCol);
   metaRow.appendChild(personTag);
 
   const titleEl = document.createElement('h4');
@@ -81,14 +106,21 @@ function createMilestoneRowElement(milestone, boardState) {
   titleEl.setAttribute('dir', 'auto');
   titleEl.textContent = milestone.title;
 
-  const detailsEl = document.createElement('p');
-  detailsEl.className = 'milestone-details';
-  detailsEl.setAttribute('dir', 'auto');
-  detailsEl.textContent = milestone.details || '';
-
   body.appendChild(metaRow);
   body.appendChild(titleEl);
-  if (milestone.details) {
+
+  const rawDetails = (milestone.details || '').trim();
+  const isRedundant =
+    !rawDetails ||
+    /^monthly milestone/i.test(rawDetails) ||
+    /^solo backpacking legs underway/i.test(rawDetails) ||
+    /^apart phase #\d begins/i.test(rawDetails);
+
+  if (!isRedundant) {
+    const detailsEl = document.createElement('p');
+    detailsEl.className = 'milestone-details';
+    detailsEl.setAttribute('dir', 'auto');
+    detailsEl.textContent = rawDetails;
     body.appendChild(detailsEl);
   }
 
@@ -128,15 +160,29 @@ function resolveLegTimelineStatus(leg, index, allLegs, nowMs, activeLegId) {
  * Renders a converged wide ReunionChapter card with its internal multi-country leg stepper.
  * @param {import('./config.js').ReunionChapter} reunion
  * @param {import('./config.js').EvaluatedBoardState} boardState
+ * @param {((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null} [onEditItem]
  * @returns {HTMLElement}
  */
-function createReunionCardElement(reunion, boardState) {
+function createReunionCardElement(reunion, boardState, onEditItem = null) {
   const isActiveReunion = boardState.activeReunion?.reunion.id === reunion.id;
   const activeLegId = isActiveReunion ? boardState.activeReunion?.activeLeg.id ?? null : null;
 
   const card = document.createElement('article');
-  card.className = `reunion-chapter-card${isActiveReunion ? ' is-active' : ''}`;
+  card.className = `reunion-chapter-card${isActiveReunion ? ' is-active' : ''} is-interactive`;
   card.dataset.reunionId = reunion.id;
+  card.setAttribute('role', 'button');
+  card.setAttribute('tabindex', '0');
+  card.setAttribute('aria-label', `Edit reunion chapter: ${reunion.title}`);
+
+  if (onEditItem) {
+    card.addEventListener('click', () => onEditItem(reunion));
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onEditItem(reunion);
+      }
+    });
+  }
 
   const header = document.createElement('div');
   header.className = 'reunion-card-header';
@@ -244,15 +290,16 @@ function createReunionCardElement(reunion, boardState) {
  * @param {Array<import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter>} items
  * @param {import('./config.js').EvaluatedBoardState} boardState
  * @param {HTMLElement} targetContainer
+ * @param {((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null} [onEditItem]
  */
-function renderChronologicalSequence(items, boardState, targetContainer) {
+function renderChronologicalSequence(items, boardState, targetContainer, onEditItem = null) {
   targetContainer.innerHTML = '';
 
   items.forEach((item) => {
     if (isReunionChapter(item)) {
-      targetContainer.appendChild(createReunionCardElement(item, boardState));
+      targetContainer.appendChild(createReunionCardElement(item, boardState, onEditItem));
     } else {
-      targetContainer.appendChild(createMilestoneRowElement(item, boardState));
+      targetContainer.appendChild(createMilestoneRowElement(item, boardState, onEditItem));
     }
   });
 }
@@ -266,7 +313,8 @@ export class TimelineRenderer {
    *   statsPillEl: HTMLElement | null,
    *   pastToggleBtn: HTMLButtonElement | null,
    *   pastDrawerEl: HTMLElement | null,
-   *   upcomingTrackEl: HTMLElement | null
+   *   upcomingTrackEl: HTMLElement | null,
+   *   onEditItem?: ((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null
    * }} elements
    */
   constructor(elements) {
@@ -274,6 +322,7 @@ export class TimelineRenderer {
     this.pastToggleBtn = elements.pastToggleBtn;
     this.pastDrawerEl = elements.pastDrawerEl;
     this.upcomingTrackEl = elements.upcomingTrackEl;
+    this.onEditItem = elements.onEditItem || null;
     this.isPastDrawerOpen = false;
 
     if (this.pastToggleBtn && this.pastDrawerEl) {
@@ -333,12 +382,12 @@ export class TimelineRenderer {
         const arrow = this.isPastDrawerOpen ? '▴' : '▾';
         this.pastToggleBtn.innerHTML = `Completed Chapters (<span class="numeric-lock" dir="ltr">${pastItems.length}</span>) ${arrow}`;
         this.syncPastDrawerVisibility();
-        renderChronologicalSequence(pastItems, boardState, this.pastDrawerEl);
+        renderChronologicalSequence(pastItems, boardState, this.pastDrawerEl, this.onEditItem);
       }
     }
 
     if (this.upcomingTrackEl) {
-      renderChronologicalSequence(upcomingItems, boardState, this.upcomingTrackEl);
+      renderChronologicalSequence(upcomingItems, boardState, this.upcomingTrackEl, this.onEditItem);
     }
   }
 }

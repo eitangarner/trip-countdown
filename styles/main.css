@@ -459,6 +459,28 @@ main {
   cursor: not-allowed;
 }
 
+.btn-danger {
+  width: 100%;
+  padding-block: 14px;
+  padding-inline: 20px;
+  border-radius: var(--radius-md);
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.btn-danger:active {
+  transform: scale(0.98);
+}
+
 .vault-error-msg {
   font-size: 0.84rem;
   font-weight: 500;
@@ -691,6 +713,70 @@ main {
   justify-content: flex-start;
   gap: 8px;
   pointer-events: none;
+}
+
+/* Photo Stack Overlays: Calendar Page Date Badge */
+.photo-date-pages {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  pointer-events: auto;
+}
+
+.date-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  padding-block: 4px 5px;
+  padding-inline: 7px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 14px rgba(20, 21, 26, 0.15), 0 1px 3px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+/* Subtle top binding accent bar like a tear-off desk calendar sheet */
+.date-page::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  height: 2.5px;
+  background: linear-gradient(
+    90deg,
+    var(--ambient-accent),
+    color-mix(in srgb, var(--ambient-accent) 60%, white)
+  );
+}
+
+.date-page-year {
+  min-width: 48px;
+}
+
+.date-page-header {
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  line-height: 1;
+  margin-block-start: 2px;
+  margin-block-end: 2px;
+  text-transform: uppercase;
+}
+
+.date-page-value {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--ink-primary);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .photo-date-pill {
@@ -1252,6 +1338,35 @@ main {
   gap: 14px;
 }
 
+.timeline-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-block: 6px;
+  padding-inline: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass-strong);
+  backdrop-filter: var(--blur-matte);
+  -webkit-backdrop-filter: var(--blur-matte);
+  border: 1px solid var(--surface-border);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-primary);
+  box-shadow: var(--surface-shadow);
+  cursor: pointer;
+  transition: transform var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.timeline-add-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: var(--surface-shadow-elevated);
+}
+
+.timeline-add-btn:active {
+  transform: scale(0.97);
+}
+
 .timeline-stats-bar {
   display: flex;
   flex-wrap: wrap;
@@ -1353,6 +1468,15 @@ main {
   box-shadow: var(--surface-shadow-elevated);
 }
 
+.milestone-card.is-interactive,
+.reunion-chapter-card.is-interactive {
+  cursor: pointer;
+}
+
+.milestone-card.is-interactive:active {
+  transform: scale(0.985);
+}
+
 .milestone-emoji-badge {
   width: 38px;
   height: 38px;
@@ -1381,10 +1505,25 @@ main {
   flex-wrap: wrap;
 }
 
+.milestone-date-col {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .milestone-date {
   font-size: 0.74rem;
   font-weight: 700;
   color: var(--ink-muted);
+}
+
+.milestone-country-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ink-secondary);
 }
 
 .milestone-person-tag {
@@ -1438,6 +1577,16 @@ main {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.reunion-chapter-card.is-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--surface-shadow-elevated);
+}
+
+.reunion-chapter-card.is-interactive:active {
+  transform: scale(0.985);
 }
 
 .reunion-chapter-card.is-active {
@@ -1882,16 +2031,18 @@ main {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ambient-accent) 18%, transparent);
 }
 
-/* GitHub Sync Status Pill */
+/* Sync Status Pill */
 .sync-status-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding-block: 5px;
+  padding-block: 4px;
   padding-inline: 11px;
   border-radius: var(--radius-pill);
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
   background: rgba(20, 21, 26, 0.06);
   color: var(--ink-secondary);
 }

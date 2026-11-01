@@ -301,7 +301,7 @@ export async function saveLiveState(
       return {
         syncedRemotely: false,
         mode: /** @type {const} */ ('local-only'),
-        message: 'Saved on this device'
+        message: 'Successfully updated'
       };
     }
 
@@ -310,7 +310,7 @@ export async function saveLiveState(
       return {
         syncedRemotely: false,
         mode: /** @type {const} */ ('queued-offline'),
-        message: 'Saved offline • Will sync to GitHub when back online'
+        message: 'Saved offline • Queued for sync'
       };
     }
 
@@ -356,7 +356,7 @@ export async function saveLiveState(
         return {
           syncedRemotely: false,
           mode: /** @type {const} */ ('queued-offline'),
-          message: `Saved locally (GitHub sync HTTP ${putRes.status})`
+          message: 'Saved locally'
         };
       }
 
@@ -364,7 +364,7 @@ export async function saveLiveState(
       return {
         syncedRemotely: true,
         mode: /** @type {const} */ ('github-api'),
-        message: 'Synced encrypted state via GitHub ✨'
+        message: 'Successfully updated'
       };
     } catch {
       await writeLocalLiveState(stampedPayload, true, cryptoKey);

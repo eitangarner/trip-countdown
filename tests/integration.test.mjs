@@ -7,8 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { COUNTRY_CATALOG, PINNED_COUNTRY_CODES, getCountryInfo } from '../js/config.js';
 import { deriveVaultCryptoKey } from '../js/crypto-vault.js';
 import { evaluateBoardState } from '../js/countdown-engine.js';
-import { FALLBACK_PHOTOS, PhotoStackController, clampHslForRole, extractLuminousPalette, rgbToHsl } from '../js/photo-stack.js';
-import { isReunionChapter } from '../js/timeline-renderer.js';
+import { FALLBACK_PHOTOS, PhotoStackController, clampHslForRole, createPhotoDateElement, extractLuminousPalette, rgbToHsl } from '../js/photo-stack.js';
+import { createMilestoneRowElement, isReunionChapter, resolveMilestonePersonMeta } from '../js/timeline-renderer.js';
 import { loadLiveState, saveLiveState } from '../js/github-sync.js';
 import { buildDefaultTripConfig } from '../scripts/encrypt-vault.mjs';
 
@@ -271,4 +271,230 @@ test('Integration: index.html contains split two-view panels, bottom nav, dedica
 
   // Bottom sheet drag handle wrapper
   assert.ok(html.includes('id="sheet-handle-wrapper"'));
+});
+
+test('Integration: createPhotoDateElement splits DD-MM-YYYY into day, month, and year calendar pages', () => {
+  const prevDoc = globalThis.document;
+  globalThis.document = /** @type {any} */ ({
+    createElement: (tag) => {
+      const el = {
+        tag,
+        className: '',
+        textContent: '',
+        children: [],
+        attrs: {},
+        setAttribute(k, v) { this.attrs[k] = v; },
+        appendChild(child) { this.children.push(child); }
+      };
+      return el;
+    }
+  });
+
+  try {
+    const pagesEl = /** @type {any} */ (createPhotoDateElement('05-10-2026'));
+    assert.equal(pagesEl.className, 'photo-date-pages numeric-lock');
+    assert.equal(pagesEl.children.length, 3);
+    assert.equal(pagesEl.children[0].className, 'date-page date-page-day');
+    assert.equal(pagesEl.children[0].children[0].textContent, 'DAY');
+    assert.equal(pagesEl.children[0].children[1].textContent, '05');
+
+    assert.equal(pagesEl.children[1].className, 'date-page date-page-month');
+    assert.equal(pagesEl.children[1].children[0].textContent, 'MONTH');
+    assert.equal(pagesEl.children[1].children[1].textContent, '10');
+
+    assert.equal(pagesEl.children[2].className, 'date-page date-page-year');
+    assert.equal(pagesEl.children[2].children[0].textContent, 'YEAR');
+    assert.equal(pagesEl.children[2].children[1].textContent, '2026');
+
+    // Fallback for non-calendar labels like Chapter 01
+    const pillEl = /** @type {any} */ (createPhotoDateElement('Chapter 01'));
+    assert.equal(pillEl.className, 'photo-date-pill numeric-lock');
+    assert.equal(pillEl.textContent, 'Chapter 01');
+  } finally {
+    globalThis.document = prevDoc;
+  }
+});
+
+test('Integration: resolveMilestonePersonMeta assigns person icons (🌸, 🌊, 💕) and createMilestoneRowElement suppresses boilerplate subtitles', () => {
+  const fakeBoardState = /** @type {any} */ ({
+    dualStatus: {
+      primary: { person: 'partnerA', displayName: 'Partner A' },
+      secondary: { person: 'partnerB', displayName: 'Partner B' }
+    }
+  });
+
+  const metaA = resolveMilestonePersonMeta('partnerA', fakeBoardState);
+  assert.equal(metaA.icon, '🌸');
+  assert.equal(metaA.label, 'Partner A');
+
+  const metaB = resolveMilestonePersonMeta('partnerB', fakeBoardState);
+  assert.equal(metaB.icon, '🌊');
+  assert.equal(metaB.label, 'Partner B');
+
+  const metaTogether = resolveMilestonePersonMeta('both', fakeBoardState);
+  assert.equal(metaTogether.icon, '💕');
+  assert.equal(metaTogether.label, 'Together');
+
+  // DOM Mock for createMilestoneRowElement
+  const prevDoc = globalThis.document;
+  function makeMockElement(tag) {
+    return {
+      tag,
+      className: '',
+      textContent: '',
+      innerHTML: '',
+      children: [],
+      attrs: {},
+      dataset: {},
+      listeners: {},
+      setAttribute(k, v) { this.attrs[k] = v; },
+      getAttribute(k) { return this.attrs[k]; },
+      appendChild(child) { this.children.push(child); },
+      addEventListener(type, fn) { this.listeners[type] = fn; }
+    };
+  }
+  globalThis.document = /** @type {any} */ ({ createElement: makeMockElement });
+
+  try {
+    let clickedItem = null;
+    const milestoneWithRedundantText = {
+      id: 'ms-test-1',
+      date: '2026-11-10',
+      category: 'anniversary',
+      emoji: '🥂',
+      title: '10 Months Together',
+      details: 'Monthly milestone (10 months since 10-01-2026)',
+      person: 'both',
+      countryCode: 'IL'
+    };
+
+    const row = /** @type {any} */ (
+      createMilestoneRowElement(
+        milestoneWithRedundantText,
+        fakeBoardState,
+        (item) => { clickedItem = item; }
+      )
+    );
+
+    assert.equal(row.className, 'milestone-row');
+    const card = row.children[0];
+    assert.ok(card.className.includes('is-interactive'));
+
+    // Check click listener triggers onEditItem
+    card.listeners['click']();
+    assert.equal(clickedItem?.id, 'ms-test-1');
+
+    // Person tag should show 💕 Together without country flag
+    const body = card.children[1];
+    const metaRow = body.children[0];
+    const countryCol = metaRow.children[0];
+    const personTag = metaRow.children[1];
+
+    assert.equal(personTag.textContent, '💕 Together');
+    assert.equal(countryCol.children[1].textContent, '🇮🇱 Israel');
+
+    // Redundant 'Monthly milestone...' details text must be suppressed from body
+    assert.equal(body.children.length, 2); // only metaRow and titleEl, no detailsEl
+  } finally {
+    globalThis.document = prevDoc;
+  }
+});
+
+test('Integration: Engine dynamically applies milestoneOverrides, chapterOverrides, and customReunions', () => {
+  const config = buildDefaultTripConfig();
+  const baseDateMs = 1761912000000; // Pre-trip epoch
+
+  const customChapter = {
+    id: 'ch-extra',
+    title: 'Weekend Escape',
+    emoji: '🏝️',
+    startDate: '2026-03-01',
+    endDate: '2026-03-05',
+    description: 'Island getaway',
+    legs: [
+      {
+        id: 'ch-extra-leg-1',
+        name: 'Weekend Escape',
+        countryCode: 'PH',
+        startDate: '2026-03-01',
+        endDate: '2026-03-05'
+      }
+    ]
+  };
+
+  const liveState = {
+    schemaVersion: 1,
+    updatedAt: new Date().toISOString(),
+    statusOverrides: {},
+    customMilestones: [
+      {
+        id: 'ms-custom-scuba',
+        title: 'Scuba Diving Day',
+        date: '2026-02-20',
+        category: 'custom',
+        emoji: '🤿',
+        person: 'both',
+        countryCode: 'TH',
+        details: 'Koh Tao coral reef dive'
+      }
+    ],
+    milestoneOverrides: {
+      'ms-custom-scuba': {
+        countryCode: 'ID', // Override country to Indonesia
+        details: 'Gili islands dive'
+      }
+    },
+    customReunions: [customChapter],
+    chapterOverrides: {
+      [config.reunions[0].id]: {
+        title: 'Southeast Asia Odyssey',
+        emoji: '🌏'
+      }
+    }
+  };
+
+  const evaluated = evaluateBoardState(config, liveState, baseDateMs);
+
+  // Check overridden milestone country and details
+  const scubaMs = evaluated.timeline.upcomingItems.find((item) => item.id === 'ms-custom-scuba');
+  assert.ok(scubaMs);
+  assert.equal(scubaMs.countryCode, 'ID');
+  assert.equal(scubaMs.details, 'Gili islands dive');
+
+  // Check overridden reunion title and emoji
+  const seaChapter = [...evaluated.timeline.upcomingItems, ...evaluated.timeline.pastItems].find(
+    (item) => item.id === config.reunions[0].id
+  );
+  assert.ok(seaChapter);
+  assert.equal(seaChapter.title, 'Southeast Asia Odyssey');
+  assert.equal(seaChapter.emoji, '🌏');
+
+  // Check custom reunion chapter was integrated
+  const extraChapter = evaluated.timeline.upcomingItems.find((item) => item.id === 'ch-extra');
+  assert.ok(extraChapter);
+  assert.equal(extraChapter.title, 'Weekend Escape');
+});
+
+test('Integration: index.html contains Timeline Header Add Button, Update Status FAB, and Timeline Item Editor Sheet', () => {
+  const html = fs.readFileSync(path.join(ROOT_DIR, 'index.html'), 'utf8');
+
+  // Timeline header Add Event / Leg button
+  assert.ok(html.includes('id="add-timeline-item-btn"'));
+  assert.ok(html.includes('+ Add Event / Leg'));
+
+  // Scoped Update Status FAB
+  assert.ok(html.includes('id="fab-edit-btn"'));
+  assert.ok(html.includes('Update Status'));
+
+  // Dedicated Timeline Item Bottom Sheet & controls
+  assert.ok(html.includes('id="timeline-item-sheet"'));
+  assert.ok(html.includes('id="timeline-sheet-backdrop"'));
+  assert.ok(html.includes('id="timeline-type-toggle-group"'));
+  assert.ok(html.includes('id="timeline-type-milestone-btn"'));
+  assert.ok(html.includes('id="timeline-type-chapter-btn"'));
+  assert.ok(html.includes('id="tl-item-id-input"'));
+  assert.ok(html.includes('id="timeline-milestone-fields"'));
+  assert.ok(html.includes('id="timeline-chapter-fields"'));
+  assert.ok(html.includes('id="tl-save-btn"'));
+  assert.ok(html.includes('id="tl-delete-btn"'));
 });

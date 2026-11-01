@@ -187,6 +187,7 @@
       <section class="timeline-section" aria-label="Journey Timeline">
         <div class="section-header-row">
           <h3 class="section-title">Journey &amp; Reunion Timeline</h3>
+          <button type="button" class="timeline-add-btn" id="add-timeline-item-btn">+ Add Event / Leg</button>
         </div>
 
         <div class="timeline-stats-bar">
@@ -209,10 +210,10 @@
     </div>
   </main>
 
-  <!-- 4. Floating Mobile Edit Mode Action Button -->
-  <button type="button" class="fab-edit-btn" id="fab-edit-btn" aria-label="Open Update Panel" hidden>
-    <span>✏️</span>
-    <span>Update</span>
+  <!-- 4. Floating Mobile Status Action Button (visible on Countdown tab) -->
+  <button type="button" class="fab-edit-btn" id="fab-edit-btn" aria-label="Update Status" hidden>
+    <span>📍</span>
+    <span>Update Status</span>
   </button>
 
   <!-- 5. App Bottom Navigation Bar -->
@@ -227,7 +228,7 @@
     </button>
   </nav>
 
-  <!-- 6. Mobile Edit Bottom Sheet -->
+  <!-- 6. Mobile Status Update Bottom Sheet -->
   <div class="edit-sheet-backdrop" id="edit-sheet-backdrop"></div>
   <aside
     class="edit-bottom-sheet"
@@ -241,14 +242,14 @@
       <div class="sheet-handle" aria-hidden="true"></div>
     </div>
     <div class="sheet-header" id="sheet-header">
-      <h2 class="sheet-title" id="edit-sheet-title">Update Board</h2>
+      <h2 class="sheet-title" id="edit-sheet-title">Update Status</h2>
       <button type="button" class="sheet-close-btn" id="edit-sheet-close-btn" aria-label="Close panel">✕</button>
     </div>
 
-    <!-- Quick Status Update -->
+    <!-- Quick Status Update Form -->
     <form class="edit-section" id="status-update-form">
       <div class="edit-section-title">
-        <span>📍 Quick Status Update</span>
+        <span>📍 Location &amp; Vibe</span>
         <span class="sync-status-pill" id="sync-status-pill" data-sync-state="synced">Ready</span>
       </div>
 
@@ -297,55 +298,153 @@
       </div>
     </form>
 
-    <!-- Add Custom Milestone -->
-    <form class="edit-section" id="add-milestone-form">
-      <div class="edit-section-title">
-        <span>✨ Add Milestone or Flight</span>
-      </div>
-      <div class="status-edit-grid">
-        <div class="form-group">
-          <label class="form-label" for="ms-title-input">Title</label>
-          <input
-            type="text"
-            class="form-input"
-            id="ms-title-input"
-            dir="auto"
-            placeholder="Milestone or flight title…"
-            required
-            maxlength="80"
-          />
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="ms-date-input">Date</label>
-          <input type="date" class="form-input numeric-lock" id="ms-date-input" dir="ltr" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="ms-person-select">Who</label>
-          <select class="form-select" id="ms-person-select"></select>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="ms-country-select">Country</label>
-          <select class="form-select" id="ms-country-select"></select>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="ms-details-input">Details / Notes (Optional)</label>
-        <input
-          type="text"
-          class="form-input"
-          id="ms-details-input"
-          dir="auto"
-          placeholder="Optional note…"
-          maxlength="120"
-        />
-      </div>
-      <button type="submit" class="btn-primary">Add to Timeline ➕</button>
-    </form>
-
     <!-- Device Lock / Reset -->
     <div style="display: flex; justify-content: center; padding-block-start: 4px;">
       <button type="button" class="preset-chip" id="lock-device-btn">🔒 Lock App</button>
     </div>
+  </aside>
+
+  <!-- 7. Timeline Item Editor Bottom Sheet (Dynamic Milestones & Chapters) -->
+  <div class="edit-sheet-backdrop" id="timeline-sheet-backdrop"></div>
+  <aside
+    class="edit-bottom-sheet"
+    id="timeline-item-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="timeline-sheet-title"
+    hidden
+  >
+    <div class="sheet-handle-wrapper" id="timeline-sheet-handle-wrapper">
+      <div class="sheet-handle" aria-hidden="true"></div>
+    </div>
+    <div class="sheet-header" id="timeline-sheet-header">
+      <h2 class="sheet-title" id="timeline-sheet-title">Timeline Item</h2>
+      <button type="button" class="sheet-close-btn" id="timeline-sheet-close-btn" aria-label="Close panel">✕</button>
+    </div>
+
+    <form class="edit-section" id="timeline-item-form">
+      <!-- Item Type Selector (Milestone vs Chapter) -->
+      <div class="profile-selector-group" id="timeline-type-toggle-group">
+        <label class="form-label" id="timeline-type-label">Entry Type</label>
+        <div class="profile-segmented-control" role="group" aria-labelledby="timeline-type-label">
+          <button type="button" class="profile-seg-btn is-active" data-type="milestone" id="timeline-type-milestone-btn">
+            Milestone Event
+          </button>
+          <button type="button" class="profile-seg-btn" data-type="chapter" id="timeline-type-chapter-btn">
+            Trip Leg / Chapter
+          </button>
+        </div>
+      </div>
+
+      <!-- Hidden ID Field for Editing Existing Items -->
+      <input type="hidden" id="tl-item-id-input" value="" />
+
+      <!-- Milestone Fields -->
+      <div id="timeline-milestone-fields">
+        <div class="form-group">
+          <label class="form-label" for="tl-title-input">Title</label>
+          <input
+            type="text"
+            class="form-input"
+            id="tl-title-input"
+            dir="auto"
+            placeholder="Event or milestone title…"
+            required
+            maxlength="80"
+          />
+        </div>
+        <div class="status-edit-grid">
+          <div class="form-group">
+            <label class="form-label" for="tl-date-input">Date</label>
+            <input type="date" class="form-input numeric-lock" id="tl-date-input" dir="ltr" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tl-person-select">Who</label>
+            <select class="form-select" id="tl-person-select"></select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="tl-country-select">Country</label>
+          <select class="form-select" id="tl-country-select"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="tl-details-input">Note / Details (Optional)</label>
+          <input
+            type="text"
+            class="form-input"
+            id="tl-details-input"
+            dir="auto"
+            placeholder="Optional custom note…"
+            maxlength="120"
+          />
+        </div>
+      </div>
+
+      <!-- Chapter / Leg Fields -->
+      <div id="timeline-chapter-fields" hidden>
+        <div class="form-group">
+          <label class="form-label" for="tl-chapter-title-input">Chapter Title</label>
+          <input
+            type="text"
+            class="form-input"
+            id="tl-chapter-title-input"
+            dir="auto"
+            placeholder="e.g. Thailand Reunion"
+            maxlength="80"
+          />
+        </div>
+        <div class="status-edit-grid">
+          <div class="form-group">
+            <label class="form-label" for="tl-chapter-emoji-input">Emoji</label>
+            <input
+              type="text"
+              class="form-input"
+              id="tl-chapter-emoji-input"
+              placeholder="🌺"
+              maxlength="4"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tl-chapter-country-select">Country</label>
+            <select class="form-select" id="tl-chapter-country-select"></select>
+          </div>
+        </div>
+        <div class="status-edit-grid">
+          <div class="form-group">
+            <label class="form-label" for="tl-start-date-input">Start Date</label>
+            <input type="date" class="form-input numeric-lock" id="tl-start-date-input" dir="ltr" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tl-end-date-input">End Date</label>
+            <input type="date" class="form-input numeric-lock" id="tl-end-date-input" dir="ltr" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="tl-chapter-desc-input">Description / Notes (Optional)</label>
+          <input
+            type="text"
+            class="form-input"
+            id="tl-chapter-desc-input"
+            dir="auto"
+            placeholder="Optional chapter notes…"
+            maxlength="120"
+          />
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-block-start: 4px;">
+        <button type="submit" class="btn-primary" style="flex: 2;" id="tl-save-btn">Save to Timeline 💾</button>
+        <button
+          type="button"
+          class="preset-chip"
+          id="tl-delete-btn"
+          style="flex: 1; padding-block: 12px; color: #dc2626; border-color: rgba(220, 38, 38, 0.3);"
+          hidden
+        >
+          Delete 🗑️
+        </button>
+      </div>
+    </form>
   </aside>
 
   <script type="module" src="./js/app.js"></script>
