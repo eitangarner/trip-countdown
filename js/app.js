@@ -472,9 +472,13 @@ export class CountdownBoardApp {
         const decrypted = await unlockAndCacheVault(this.encryptedVaultJson, password, remember);
         if (this.dom.vaultPasswordInput) this.dom.vaultPasswordInput.value = '';
         await this.mountUnlockedVault(decrypted);
-      } catch {
+      } catch (err) {
         if (this.dom.vaultErrorMsg) {
-          this.dom.vaultErrorMsg.textContent = 'Incorrect password — please try again.';
+          const message =
+            err instanceof Error && err.message.includes('tripConfig')
+              ? 'Vault schema outdated — re-run scripts/encrypt-vault.mjs with your password.'
+              : 'Incorrect password — please try again.';
+          this.dom.vaultErrorMsg.textContent = message;
         }
         this.dom.vaultCard?.classList.remove('is-error');
         void this.dom.vaultCard?.offsetWidth;
