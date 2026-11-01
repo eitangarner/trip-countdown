@@ -312,18 +312,21 @@ test('Integration: createPhotoDateElement splits DD-MM-YYYY into day, month, and
     const compactPages = /** @type {any} */ (createPhotoDateElement('15-12-2026', { isCompact: true }));
     assert.ok(compactPages.className.includes('date-pages-compact'));
 
-    // Range support produces segmented pill with start, separator, and end units
+    // Range support produces two separate pill elements with a separator
     const rangePages = /** @type {any} */ (createPhotoDateElement('31-12-2026 – 10-01-2027', { isCompact: true }));
-    assert.ok(rangePages.className.includes('photo-date-pages'));
-    assert.ok(rangePages.className.includes('date-pages-compact'));
-    assert.equal(rangePages.children.length, 7); // 3 start + 1 sep + 3 end
-    assert.equal(rangePages.children[0].children[0].textContent, '31');
-    assert.equal(rangePages.children[1].children[0].textContent, '12');
-    assert.equal(rangePages.children[2].children[0].textContent, '2026');
-    assert.equal(rangePages.children[3].textContent, '–');
-    assert.equal(rangePages.children[4].children[0].textContent, '10');
-    assert.equal(rangePages.children[5].children[0].textContent, '01');
-    assert.equal(rangePages.children[6].children[0].textContent, '2027');
+    assert.ok(rangePages.className.includes('photo-date-range-container'));
+    assert.equal(rangePages.children.length, 3); // start pill + separator + end pill
+    assert.ok(rangePages.children[0].className.includes('photo-date-pages'));
+    assert.ok(rangePages.children[0].className.includes('date-pages-compact'));
+    assert.equal(rangePages.children[0].children[0].children[0].textContent, '31');
+    assert.equal(rangePages.children[0].children[1].children[0].textContent, '12');
+    assert.equal(rangePages.children[0].children[2].children[0].textContent, '2026');
+    assert.equal(rangePages.children[1].textContent, '–');
+    assert.ok(rangePages.children[2].className.includes('photo-date-pages'));
+    assert.ok(rangePages.children[2].className.includes('date-pages-compact'));
+    assert.equal(rangePages.children[2].children[0].children[0].textContent, '10');
+    assert.equal(rangePages.children[2].children[1].children[0].textContent, '01');
+    assert.equal(rangePages.children[2].children[2].children[0].textContent, '2027');
   } finally {
     globalThis.document = prevDoc;
   }

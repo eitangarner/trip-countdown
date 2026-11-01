@@ -802,16 +802,27 @@ main {
 }
 
 .date-page-range-sep {
-  margin-inline: 4px;
+  margin-inline: 1px;
   font-size: 0.70rem;
   font-weight: 600;
   color: var(--ink-muted);
-  opacity: 0.6;
+  opacity: 0.65;
+  user-select: none;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
+.photo-date-range-container.is-compact .date-page-range-sep,
 .date-pages-compact .date-page-range-sep {
   font-size: 0.66rem;
-  margin-inline: 3px;
+  opacity: 0.65;
+}
+
+.photo-date-range-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  vertical-align: middle;
 }
 
 .timeline-date-pill {
@@ -1528,7 +1539,7 @@ main {
   border: 1px solid var(--surface-border);
   box-shadow: var(--surface-shadow);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
@@ -1713,23 +1724,37 @@ main {
 .reunion-title-group {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  min-width: 0;
 }
 
 .reunion-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 1.65rem;
   line-height: 1;
+  flex-shrink: 0;
+}
+
+.reunion-title-stack {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
 }
 
 .reunion-title {
   font-size: 1.1rem;
   font-weight: 800;
+  line-height: 1.25;
   letter-spacing: -0.02em;
   color: var(--ink-primary);
 }
 
 .reunion-date-range {
-  margin-block-start: 4px;
+  margin-block-start: 0;
   width: fit-content;
 }
 

@@ -199,6 +199,7 @@ function createReunionCardElement(reunion, boardState, onEditItem = null, onDele
   emojiSpan.textContent = reunion.emoji || '🌺';
 
   const titleStack = document.createElement('div');
+  titleStack.className = 'reunion-title-stack';
   const titleEl = document.createElement('h3');
   titleEl.className = 'reunion-title';
   titleEl.setAttribute('dir', 'auto');

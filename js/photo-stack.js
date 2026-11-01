@@ -527,15 +527,18 @@ export function createPhotoDateElement(dateLabel, { isCompact = false } = {}) {
     const startParts = parseDateParts(rangeSplit[0]);
     const endParts = parseDateParts(rangeSplit[1]);
     if (startParts && endParts) {
-      const pagesContainer = document.createElement('div');
-      pagesContainer.className = `${isCompact ? 'photo-date-pages date-pages-compact' : 'photo-date-pages'} numeric-lock`;
-      pagesContainer.setAttribute('dir', 'ltr');
-      pagesContainer.setAttribute('aria-label', `Date: ${startParts.day}-${startParts.month}-${startParts.year} – ${endParts.day}-${endParts.month}-${endParts.year}`);
+      const rangeContainer = document.createElement('div');
+      rangeContainer.className = `photo-date-range-container${isCompact ? ' is-compact' : ''} numeric-lock`;
+      rangeContainer.setAttribute('dir', 'ltr');
+      rangeContainer.setAttribute('aria-label', `Date: ${startParts.day}-${startParts.month}-${startParts.year} – ${endParts.day}-${endParts.month}-${endParts.year}`);
+
+      const startPill = document.createElement('div');
+      startPill.className = isCompact ? 'photo-date-pages date-pages-compact' : 'photo-date-pages';
 
       const startUnits = [
         { val: startParts.day, cls: 'date-page-day' },
         { val: startParts.month, cls: 'date-page-month' },
-        { val: startParts.year, cls: 'date-page-year date-page-no-slash' }
+        { val: startParts.year, cls: 'date-page-year' }
       ];
 
       for (const unit of startUnits) {
@@ -545,13 +548,15 @@ export function createPhotoDateElement(dateLabel, { isCompact = false } = {}) {
         value.className = 'date-page-value';
         value.textContent = unit.val;
         page.appendChild(value);
-        pagesContainer.appendChild(page);
+        startPill.appendChild(page);
       }
 
       const sep = document.createElement('span');
       sep.className = 'date-page-range-sep';
       sep.textContent = '–';
-      pagesContainer.appendChild(sep);
+
+      const endPill = document.createElement('div');
+      endPill.className = isCompact ? 'photo-date-pages date-pages-compact' : 'photo-date-pages';
 
       const endUnits = [
         { val: endParts.day, cls: 'date-page-day' },
@@ -566,15 +571,42 @@ export function createPhotoDateElement(dateLabel, { isCompact = false } = {}) {
         value.className = 'date-page-value';
         value.textContent = unit.val;
         page.appendChild(value);
-        pagesContainer.appendChild(page);
+        endPill.appendChild(page);
       }
 
-      return pagesContainer;
+      rangeContainer.appendChild(startPill);
+      rangeContainer.appendChild(sep);
+      rangeContainer.appendChild(endPill);
+
+      return rangeContainer;
     }
   }
 
   const singleParts = parseDateParts(dateLabel);
   if (!singleParts) {
+    if (rangeSplit && rangeSplit.length === 2) {
+      const rangeContainer = document.createElement('div');
+      rangeContainer.className = `photo-date-range-container${isCompact ? ' is-compact' : ''} numeric-lock`;
+      rangeContainer.setAttribute('dir', 'ltr');
+
+      const startPill = document.createElement('div');
+      startPill.className = isCompact ? 'timeline-date-pill' : 'photo-date-pill';
+      startPill.textContent = rangeSplit[0];
+
+      const sep = document.createElement('span');
+      sep.className = 'date-page-range-sep';
+      sep.textContent = '–';
+
+      const endPill = document.createElement('div');
+      endPill.className = isCompact ? 'timeline-date-pill' : 'photo-date-pill';
+      endPill.textContent = rangeSplit[1];
+
+      rangeContainer.appendChild(startPill);
+      rangeContainer.appendChild(sep);
+      rangeContainer.appendChild(endPill);
+      return rangeContainer;
+    }
+
     const singlePill = document.createElement('div');
     singlePill.className = `${isCompact ? 'timeline-date-pill' : 'photo-date-pill'} numeric-lock`;
     singlePill.setAttribute('dir', 'ltr');
