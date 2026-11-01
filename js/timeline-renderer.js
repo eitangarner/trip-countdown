@@ -316,6 +316,7 @@ export class TimelineRenderer {
   /**
    * @param {{
    *   statsPillEl: HTMLElement | null,
+   *   daysDrawerEl?: HTMLElement | null,
    *   pastToggleBtn: HTMLButtonElement | null,
    *   pastDrawerEl: HTMLElement | null,
    *   upcomingTrackEl: HTMLElement | null,
@@ -325,12 +326,21 @@ export class TimelineRenderer {
    */
   constructor(elements) {
     this.statsPillEl = elements.statsPillEl;
+    this.daysDrawerEl = elements.daysDrawerEl || null;
     this.pastToggleBtn = elements.pastToggleBtn;
     this.pastDrawerEl = elements.pastDrawerEl;
     this.upcomingTrackEl = elements.upcomingTrackEl;
     this.onEditItem = elements.onEditItem || null;
     this.onDeleteItem = elements.onDeleteItem || null;
     this.isPastDrawerOpen = false;
+    this.isDaysDrawerOpen = false;
+
+    if (this.statsPillEl && this.daysDrawerEl) {
+      this.statsPillEl.addEventListener('click', () => {
+        this.isDaysDrawerOpen = !this.isDaysDrawerOpen;
+        this.syncDaysDrawerVisibility();
+      });
+    }
 
     if (this.pastToggleBtn && this.pastDrawerEl) {
       this.pastToggleBtn.addEventListener('click', () => {
@@ -338,6 +348,13 @@ export class TimelineRenderer {
         this.syncPastDrawerVisibility();
       });
     }
+  }
+
+  syncDaysDrawerVisibility() {
+    if (!this.statsPillEl || !this.daysDrawerEl) return;
+    this.statsPillEl.setAttribute('aria-expanded', String(this.isDaysDrawerOpen));
+    this.statsPillEl.classList.toggle('is-open', this.isDaysDrawerOpen);
+    this.daysDrawerEl.hidden = !this.isDaysDrawerOpen;
   }
 
   syncPastDrawerVisibility() {
@@ -351,8 +368,17 @@ export class TimelineRenderer {
    * Empties all rendered timeline nodes and resets state on device lock.
    */
   clear() {
+    this.isDaysDrawerOpen = false;
     this.isPastDrawerOpen = false;
-    if (this.statsPillEl) this.statsPillEl.textContent = '';
+    if (this.statsPillEl) {
+      this.statsPillEl.textContent = '';
+      this.statsPillEl.setAttribute('aria-expanded', 'false');
+      this.statsPillEl.classList.remove('is-open');
+    }
+    if (this.daysDrawerEl) {
+      this.daysDrawerEl.hidden = true;
+      this.daysDrawerEl.innerHTML = '';
+    }
     if (this.pastToggleBtn) {
       this.pastToggleBtn.hidden = true;
       this.pastToggleBtn.textContent = '';
@@ -371,13 +397,39 @@ export class TimelineRenderer {
    * @param {import('./config.js').EvaluatedBoardState} boardState
    */
   render(boardState) {
-    const { plannedTripDaysTogether, completedTripDaysTogether, pastItems, upcomingItems } = boardState.timeline;
+    const { plannedTripDaysTogether, completedTripDaysTogether, countryDaysBreakdown, pastItems, upcomingItems } = boardState.timeline;
 
     if (this.statsPillEl) {
       const completedSuffix = completedTripDaysTogether > 0
-        ? ` • ${completedTripDaysTogether} Completed`
+        ? ` (${completedTripDaysTogether})`
         : '';
-      this.statsPillEl.innerHTML = `🌏 <span class="numeric-lock" dir="ltr">${plannedTripDaysTogether} Trip Days Together Planned${completedSuffix}</span>`;
+      this.statsPillEl.innerHTML = `<span>🌏 <span class="numeric-lock" dir="ltr">${plannedTripDaysTogether}</span> Days Together${completedSuffix}</span><span class="trip-stats-arrow" aria-hidden="true">▾</span>`;
+    }
+
+    if (this.daysDrawerEl) {
+      this.syncDaysDrawerVisibility();
+      const breakdown = countryDaysBreakdown || [];
+      if (breakdown.length === 0) {
+        this.daysDrawerEl.innerHTML = '';
+      } else {
+        this.daysDrawerEl.innerHTML = `
+          <div class="days-breakdown-header">
+            <span class="days-breakdown-title">Days Together by Country</span>
+            <span class="days-breakdown-total numeric-lock" dir="ltr">${plannedTripDaysTogether} Days Total</span>
+          </div>
+          <div class="days-breakdown-list">
+            ${breakdown.map((item) => `
+              <div class="days-breakdown-item">
+                <div class="days-breakdown-country">
+                  <span class="days-breakdown-flag">${item.flag}</span>
+                  <span class="days-breakdown-name">${item.countryName}</span>
+                </div>
+                <span class="days-breakdown-count numeric-lock" dir="ltr">${item.days} ${item.days === 1 ? 'Day' : 'Days'}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
     }
 
     if (this.pastToggleBtn && this.pastDrawerEl) {

@@ -186,7 +186,13 @@
       <!-- Section 3: Split-and-Merge Chronological Timeline -->
       <section class="timeline-section" aria-label="Journey Timeline">
         <div class="timeline-header-bar">
-          <div class="trip-stats-pill" id="trip-stats-pill"></div>
+          <button
+            type="button"
+            class="trip-stats-pill"
+            id="trip-stats-pill"
+            aria-expanded="false"
+            aria-label="Toggle country days breakdown"
+          ></button>
           <div class="timeline-header-actions">
             <button
               type="button"
@@ -198,6 +204,9 @@
             <button type="button" class="timeline-add-btn" id="add-timeline-item-btn">+ Add Event</button>
           </div>
         </div>
+
+        <!-- Collapsible Days Breakdown Drawer -->
+        <div class="days-breakdown-drawer" id="days-breakdown-drawer" hidden></div>
 
         <!-- Collapsible Past Chapters Drawer -->
         <div class="past-chapters-drawer" id="past-chapters-drawer" hidden></div>

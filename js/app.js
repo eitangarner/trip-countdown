@@ -132,6 +132,7 @@ export class CountdownBoardApp {
     });
     this.timelineRenderer = new TimelineRenderer({
       statsPillEl: this.dom.tripStatsPill,
+      daysDrawerEl: this.dom.daysBreakdownDrawer,
       pastToggleBtn: this.dom.pastChaptersToggle,
       pastDrawerEl: this.dom.pastChaptersDrawer,
       upcomingTrackEl: this.dom.timelineUpcomingTrack,
@@ -206,6 +207,7 @@ export class CountdownBoardApp {
       secondaryTzOffset: document.getElementById('secondary-tz-offset'),
 
       tripStatsPill: document.getElementById('trip-stats-pill'),
+      daysBreakdownDrawer: document.getElementById('days-breakdown-drawer'),
       pastChaptersToggle: /** @type {HTMLButtonElement | null} */ (document.getElementById('past-chapters-toggle')),
       pastChaptersDrawer: document.getElementById('past-chapters-drawer'),
       timelineUpcomingTrack: document.getElementById('timeline-upcoming-track'),

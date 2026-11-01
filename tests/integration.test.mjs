@@ -529,9 +529,10 @@ test('Integration: Engine dynamically applies milestoneOverrides, chapterOverrid
 test('Integration: index.html contains Timeline Header Add Button, Update Status FAB, and Timeline Item Editor Sheet', () => {
   const html = fs.readFileSync(path.join(ROOT_DIR, 'index.html'), 'utf8');
 
-  // Timeline header Add Event button
+  // Timeline header Add Event button & collapsible drawers
   assert.ok(html.includes('id="add-timeline-item-btn"'));
   assert.ok(html.includes('+ Add Event'));
+  assert.ok(html.includes('id="days-breakdown-drawer"'));
 
   // Scoped Update Status FAB
   assert.ok(html.includes('id="fab-edit-btn"'));

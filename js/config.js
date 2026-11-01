@@ -184,6 +184,7 @@
  * @property {{
  *   plannedTripDaysTogether: number,
  *   completedTripDaysTogether: number,
+ *   countryDaysBreakdown: Array<{ countryCode: string, countryName: string, flag: string, days: number }>,
  *   pastItems: Array<MilestoneEvent | ReunionChapter>,
  *   upcomingItems: Array<MilestoneEvent | ReunionChapter>
  * }} timeline

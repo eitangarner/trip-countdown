@@ -239,6 +239,8 @@ test('Phase 1: Pre-Trip at Home (2025-10-31T12:00:00+02:00)', () => {
 
   assert.equal(state.timeline.plannedTripDaysTogether, 53);
   assert.equal(state.timeline.completedTripDaysTogether, 0);
+  assert.ok(Array.isArray(state.timeline.countryDaysBreakdown));
+  assert.equal(state.timeline.countryDaysBreakdown.reduce((sum, item) => sum + item.days, 0), 53);
   assert.equal(state.timeline.pastItems.length, 1);
   assert.equal(state.timeline.pastItems[0].id, 'ms-origin');
 });

@@ -864,6 +864,23 @@ export function evaluateBoardState(config, liveState = null, nowMs) {
     return sum;
   }, 0);
 
+  /** @type {Map<string, { countryCode: string, countryName: string, flag: string, days: number }>} */
+  const countryDaysMap = new Map();
+  for (const rw of reunionWindows) {
+    for (const lw of rw.legWindows) {
+      const code = lw.country.code;
+      const existing = countryDaysMap.get(code) || {
+        countryCode: code,
+        countryName: lw.country.name,
+        flag: lw.country.flag,
+        days: 0
+      };
+      existing.days += lw.totalLegDays;
+      countryDaysMap.set(code, existing);
+    }
+  }
+  const countryDaysBreakdown = Array.from(countryDaysMap.values());
+
   const timelineDescriptors = [
     ...allMilestones.map((ms) => {
       const msCountry = resolveCountry(ms.countryCode || config.homeCountryCode);
@@ -930,6 +947,7 @@ export function evaluateBoardState(config, liveState = null, nowMs) {
     timeline: {
       plannedTripDaysTogether,
       completedTripDaysTogether,
+      countryDaysBreakdown,
       pastItems,
       upcomingItems
     }
