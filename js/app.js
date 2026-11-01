@@ -1077,8 +1077,9 @@ export class CountdownBoardApp {
     if (this.dom.daysModalBackdrop) this.dom.daysModalBackdrop.hidden = false;
     if (this.dom.daysBreakdownModal) this.dom.daysBreakdownModal.hidden = false;
 
-    const breakdown = this.latestBoardState?.timeline.countryDaysBreakdown || [];
-    const plannedDays = this.latestBoardState?.timeline.plannedTripDaysTogether ?? 0;
+    const state = this.latestBoardState ?? evaluateBoardState(this.#tripConfig, this.liveState, this.getEffectiveNowMs());
+    const breakdown = state.timeline.countryDaysBreakdown || [];
+    const plannedDays = state.timeline.plannedTripDaysTogether ?? 0;
 
     if (this.dom.daysModalTotalPill) {
       this.dom.daysModalTotalPill.textContent = `${plannedDays} Days Total`;
@@ -1334,6 +1335,7 @@ export class CountdownBoardApp {
 
     const nowMs = this.getEffectiveNowMs();
     const state = evaluateBoardState(this.#tripConfig, this.liveState, nowMs);
+    this.latestBoardState = state;
 
     // 1. Relationship Duration Top Pill
     const rel = state.relationshipDuration;
