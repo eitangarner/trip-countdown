@@ -1260,10 +1260,6 @@ main {
   padding-inline: 4px;
 }
 
-.timeline-section .section-header-row {
-  justify-content: flex-end;
-}
-
 .section-title {
   font-size: 0.82rem;
   font-weight: 700;
@@ -1490,7 +1486,7 @@ main {
   transform: scale(0.97);
 }
 
-.timeline-stats-bar {
+.timeline-header-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1498,11 +1494,17 @@ main {
   gap: 10px;
 }
 
+.timeline-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .trip-stats-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding-block: 7px;
+  padding-block: 6px;
   padding-inline: 13px;
   border-radius: var(--radius-pill);
   background: var(--surface-glass);
@@ -1510,7 +1512,7 @@ main {
   -webkit-backdrop-filter: var(--blur-matte);
   border: 1px solid var(--surface-border);
   box-shadow: var(--surface-shadow);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: var(--ink-primary);
 }
@@ -1932,7 +1934,6 @@ main {
   z-index: 60;
   display: inline-flex;
   align-items: center;
-  position: relative;
   gap: 6px;
   padding: 5px;
   border-radius: var(--radius-pill);

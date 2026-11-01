@@ -185,19 +185,18 @@
     <div class="view-panel" id="view-timeline" hidden>
       <!-- Section 3: Split-and-Merge Chronological Timeline -->
       <section class="timeline-section" aria-label="Journey Timeline">
-        <div class="section-header-row">
-          <button type="button" class="timeline-add-btn" id="add-timeline-item-btn">+ Add Event</button>
-        </div>
-
-        <div class="timeline-stats-bar">
+        <div class="timeline-header-bar">
           <div class="trip-stats-pill" id="trip-stats-pill"></div>
-          <button
-            type="button"
-            class="past-chapters-toggle"
-            id="past-chapters-toggle"
-            aria-expanded="false"
-            hidden
-          ></button>
+          <div class="timeline-header-actions">
+            <button
+              type="button"
+              class="past-chapters-toggle"
+              id="past-chapters-toggle"
+              aria-expanded="false"
+              hidden
+            ></button>
+            <button type="button" class="timeline-add-btn" id="add-timeline-item-btn">+ Add Event</button>
+          </div>
         </div>
 
         <!-- Collapsible Past Chapters Drawer -->
