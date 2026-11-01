@@ -136,8 +136,7 @@ export class CountdownBoardApp {
       pastDrawerEl: this.dom.pastChaptersDrawer,
       upcomingTrackEl: this.dom.timelineUpcomingTrack,
       onEditItem: (item) => this.openEventModal(item),
-      onDeleteItem: (item) => this.deleteTimelineItem(item),
-      onEditLeg: (reunion, leg) => this.openTimelineItemEditor(reunion, leg.id)
+      onDeleteItem: (item) => this.deleteTimelineItem(item)
     });
   }
 
@@ -243,15 +242,15 @@ export class CountdownBoardApp {
       timelineMilestoneFields: document.getElementById('timeline-milestone-fields'),
       tlTitleInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-title-input')),
       tlDateInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-date-input')),
-      tlTimeInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-time-input')),
       tlPersonSelect: /** @type {HTMLSelectElement | null} */ (document.getElementById('tl-person-select')),
       tlCountrySelect: /** @type {HTMLSelectElement | null} */ (document.getElementById('tl-country-select')),
       tlDetailsInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-details-input')),
       timelineChapterFields: document.getElementById('timeline-chapter-fields'),
       tlChapterTitleInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-chapter-title-input')),
       tlChapterEmojiInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-chapter-emoji-input')),
-      tlAddLegBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('tl-add-leg-btn')),
-      tlLegsList: document.getElementById('tl-legs-list'),
+      tlChapterCountrySelect: /** @type {HTMLSelectElement | null} */ (document.getElementById('tl-chapter-country-select')),
+      tlStartDateInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-start-date-input')),
+      tlEndDateInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-end-date-input')),
       tlChapterDescInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-chapter-desc-input')),
       tlSaveBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('tl-save-btn')),
       tlDeleteBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('tl-delete-btn')),
@@ -263,8 +262,6 @@ export class CountdownBoardApp {
       eventModalStatusPill: document.getElementById('event-modal-status-pill'),
       eventModalDatePill: document.getElementById('event-modal-date-pill'),
       eventModalTitle: document.getElementById('event-modal-title'),
-      eventModalTitleEditBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('event-modal-title-edit-btn')),
-      eventModalCountries: document.getElementById('event-modal-countries'),
       eventModalLocation: document.getElementById('event-modal-location'),
       eventCdDays: document.getElementById('event-cd-days'),
       eventCdHours: document.getElementById('event-cd-hours'),
@@ -585,11 +582,6 @@ export class CountdownBoardApp {
       this.closeEventModal();
       if (item) this.openTimelineItemEditor(item);
     });
-    this.dom.eventModalTitleEditBtn?.addEventListener('click', () => {
-      const item = this.#activeEventModalItem;
-      this.closeEventModal();
-      if (item) this.openTimelineItemEditor(item);
-    });
 
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
@@ -695,22 +687,6 @@ export class CountdownBoardApp {
     this.dom.timelineTypeChapterBtn?.addEventListener('click', () => {
       this.setTimelineEditorMode('chapter');
     });
-    this.dom.tlAddLegBtn?.addEventListener('click', () => {
-      const lastLeg = this.editingChapterLegs?.[this.editingChapterLegs.length - 1];
-      const today = new Date().toISOString().slice(0, 10);
-      const nextDate = lastLeg?.endDate || today;
-      const newLeg = {
-        id: `leg-${Date.now()}`,
-        countryCode: this.#tripConfig?.homeCountryCode || 'US',
-        label: '',
-        startDate: nextDate,
-        endDate: nextDate,
-        startTime: '',
-        endTime: ''
-      };
-      this.editingChapterLegs = [...(this.editingChapterLegs || []), newLeg];
-      this.renderChapterLegsEditor(newLeg.id);
-    });
 
     // 9. Timeline Item Form Submit (Milestone or Chapter)
     this.dom.timelineItemForm?.addEventListener('submit', async (event) => {
@@ -721,17 +697,13 @@ export class CountdownBoardApp {
 
       if (this.timelineEditorMode === 'chapter') {
         const title = (this.dom.tlChapterTitleInput?.value || '').trim();
-        const emoji = (this.dom.tlChapterEmojiInput?.value || '').trim() || '🌺';
+        const emoji = (this.dom.tlChapterEmojiInput?.value || '').trim() || '✈️';
+        const countryCode = this.dom.tlChapterCountrySelect?.value || this.#tripConfig.homeCountryCode || 'US';
+        const startDate = this.dom.tlStartDateInput?.value || '';
+        const endDate = this.dom.tlEndDateInput?.value || '';
         const description = (this.dom.tlChapterDescInput?.value || '').trim();
 
-        if (!title || !this.editingChapterLegs || this.editingChapterLegs.length === 0) return;
-
-        const legs = [...this.editingChapterLegs].sort((a, b) => a.startDate.localeCompare(b.startDate));
-        const startDate = legs[0].startDate;
-        const endDate = legs[legs.length - 1].endDate;
-        const countryCode = legs[0].countryCode;
-
-        if (!startDate || !endDate) return;
+        if (!title || !startDate || !endDate) return;
 
         if (!id) {
           const newId = `custom-ch-${Date.now()}`;
@@ -742,11 +714,15 @@ export class CountdownBoardApp {
             startDate,
             endDate,
             description,
-            legs: legs.map((l, i) => ({
-              ...l,
-              id: l.id || `${newId}-leg-${i + 1}`,
-              label: l.label || ''
-            }))
+            legs: [
+              {
+                id: `${newId}-leg-1`,
+                name: title,
+                countryCode,
+                startDate,
+                endDate
+              }
+            ]
           };
           this.liveState = {
             ...this.liveState,
@@ -764,11 +740,15 @@ export class CountdownBoardApp {
               startDate,
               endDate,
               description,
-              legs: legs.map((l, i) => ({
-                ...l,
-                id: l.id || `${id}-leg-${i + 1}`,
-                label: l.label || ''
-              }))
+              legs: [
+                {
+                  id: existing.legs?.[0]?.id || `${id}-leg-1`,
+                  name: title,
+                  countryCode,
+                  startDate,
+                  endDate
+                }
+              ]
             };
             this.liveState = { ...this.liveState, customReunions: updated };
           } else {
@@ -777,18 +757,12 @@ export class CountdownBoardApp {
               chapterOverrides: {
                 ...(this.liveState.chapterOverrides || {}),
                 [id]: {
-                  ...(this.liveState.chapterOverrides?.[id] || {}),
                   title,
                   emoji,
                   startDate,
                   endDate,
                   countryCode,
                   description,
-                  legs: legs.map((l, i) => ({
-                    ...l,
-                    id: l.id || `${id}-leg-${i + 1}`,
-                    label: l.label || ''
-                  })),
                   hidden: false
                 }
               }
@@ -798,7 +772,6 @@ export class CountdownBoardApp {
       } else {
         const title = (this.dom.tlTitleInput?.value || '').trim();
         const date = this.dom.tlDateInput?.value || '';
-        const time = (this.dom.tlTimeInput?.value || '').trim() || undefined;
         const person = this.dom.tlPersonSelect?.value || 'both';
         const countryCode = this.dom.tlCountrySelect?.value || this.#tripConfig.homeCountryCode || 'US';
         const details = (this.dom.tlDetailsInput?.value || '').trim();
@@ -810,7 +783,6 @@ export class CountdownBoardApp {
           const newMilestone = {
             id: newId,
             date,
-            time,
             category: /** @type {const} */ ('custom'),
             emoji: person === 'both' ? '💖' : '📍',
             title,
@@ -830,7 +802,6 @@ export class CountdownBoardApp {
               ...updated[customIdx],
               title,
               date,
-              time,
               person,
               countryCode,
               details
@@ -842,10 +813,8 @@ export class CountdownBoardApp {
               milestoneOverrides: {
                 ...(this.liveState.milestoneOverrides || {}),
                 [id]: {
-                  ...(this.liveState.milestoneOverrides?.[id] || {}),
                   title,
                   date,
-                  time,
                   person,
                   countryCode,
                   details,
@@ -993,200 +962,13 @@ export class CountdownBoardApp {
     if (this.dom.timelineChapterFields) {
       this.dom.timelineChapterFields.style.display = isMilestone ? 'none' : 'block';
     }
-    if (mode === 'chapter' && (!this.editingChapterLegs || this.editingChapterLegs.length === 0)) {
-      const today = new Date().toISOString().slice(0, 10);
-      this.editingChapterLegs = [
-        {
-          id: `leg-${Date.now()}`,
-          countryCode: this.#tripConfig?.homeCountryCode || 'US',
-          label: '',
-          startDate: today,
-          endDate: today,
-          startTime: '',
-          endTime: ''
-        }
-      ];
-      this.renderChapterLegsEditor();
-    }
-  }
-
-  /**
-   * Renders the dynamic list of editable country legs inside the chapter editor sheet.
-   * @param {string | null} [targetLegId]
-   */
-  renderChapterLegsEditor(targetLegId = null) {
-    if (!this.dom.tlLegsList || !this.#tripConfig) return;
-    this.dom.tlLegsList.replaceChildren();
-
-    const pinnedCodes = this.#tripConfig.pinnedCountryCodes?.length
-      ? this.#tripConfig.pinnedCountryCodes
-      : PINNED_COUNTRY_CODES;
-
-    this.editingChapterLegs.forEach((leg, index) => {
-      const card = document.createElement('div');
-      card.className = `leg-edit-card${targetLegId && leg.id === targetLegId ? ' is-targeted' : ''}`;
-      card.dataset.legIndex = String(index);
-
-      const header = document.createElement('div');
-      header.className = 'leg-edit-card-header';
-
-      const title = document.createElement('span');
-      title.className = 'leg-edit-card-title';
-      const cInfo = getCountryInfo(leg.countryCode);
-      title.textContent = `📍 Stop ${index + 1}: ${cInfo ? `${cInfo.flag} ${leg.label || cInfo.name}` : 'Country'}`;
-      header.appendChild(title);
-
-      if (this.editingChapterLegs.length > 1) {
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'leg-edit-remove-btn';
-        removeBtn.textContent = 'Remove ✕';
-        removeBtn.addEventListener('click', () => {
-          this.editingChapterLegs.splice(index, 1);
-          this.renderChapterLegsEditor();
-        });
-        header.appendChild(removeBtn);
-      }
-      card.appendChild(header);
-
-      const grid1 = document.createElement('div');
-      grid1.className = 'status-edit-grid';
-
-      const countryGroup = document.createElement('div');
-      countryGroup.className = 'form-group';
-      const countryLabel = document.createElement('label');
-      countryLabel.className = 'form-label';
-      countryLabel.textContent = 'Country';
-      const countrySelect = document.createElement('select');
-      countrySelect.className = 'form-select';
-      populateCountrySelect(countrySelect, leg.countryCode, pinnedCodes);
-      countrySelect.addEventListener('change', () => {
-        leg.countryCode = countrySelect.value;
-        const newInfo = getCountryInfo(leg.countryCode);
-        title.textContent = `📍 Stop ${index + 1}: ${newInfo ? `${newInfo.flag} ${leg.label || newInfo.name}` : 'Country'}`;
-      });
-      countryGroup.appendChild(countryLabel);
-      countryGroup.appendChild(countrySelect);
-
-      const labelGroup = document.createElement('div');
-      labelGroup.className = 'form-group';
-      const labelLabel = document.createElement('label');
-      labelLabel.className = 'form-label';
-      labelLabel.textContent = 'Stop / City Name (Optional)';
-      const labelInput = document.createElement('input');
-      labelInput.type = 'text';
-      labelInput.className = 'form-input';
-      labelInput.setAttribute('dir', 'auto');
-      labelInput.placeholder = 'e.g. Tokyo & Kyoto';
-      labelInput.value = leg.label || '';
-      labelInput.addEventListener('input', () => {
-        leg.label = labelInput.value.trim();
-        const currentInfo = getCountryInfo(leg.countryCode);
-        title.textContent = `📍 Stop ${index + 1}: ${currentInfo ? `${currentInfo.flag} ${leg.label || currentInfo.name}` : 'Country'}`;
-      });
-      labelGroup.appendChild(labelLabel);
-      labelGroup.appendChild(labelInput);
-
-      grid1.appendChild(countryGroup);
-      grid1.appendChild(labelGroup);
-      card.appendChild(grid1);
-
-      const grid2 = document.createElement('div');
-      grid2.className = 'status-edit-grid';
-
-      const startDateGroup = document.createElement('div');
-      startDateGroup.className = 'form-group';
-      const startDateLabel = document.createElement('label');
-      startDateLabel.className = 'form-label';
-      startDateLabel.textContent = 'Start Date';
-      const startDateInput = document.createElement('input');
-      startDateInput.type = 'date';
-      startDateInput.className = 'form-input numeric-lock';
-      startDateInput.setAttribute('dir', 'ltr');
-      startDateInput.required = true;
-      startDateInput.value = leg.startDate || '';
-      startDateInput.addEventListener('change', () => {
-        leg.startDate = startDateInput.value;
-      });
-      startDateGroup.appendChild(startDateLabel);
-      startDateGroup.appendChild(startDateInput);
-
-      const startTimeGroup = document.createElement('div');
-      startTimeGroup.className = 'form-group';
-      const startTimeLabel = document.createElement('label');
-      startTimeLabel.className = 'form-label';
-      startTimeLabel.textContent = 'Start Time (Optional)';
-      const startTimeInput = document.createElement('input');
-      startTimeInput.type = 'time';
-      startTimeInput.className = 'form-input numeric-lock';
-      startTimeInput.setAttribute('dir', 'ltr');
-      startTimeInput.value = leg.startTime || '';
-      startTimeInput.addEventListener('change', () => {
-        leg.startTime = startTimeInput.value;
-      });
-      startTimeGroup.appendChild(startTimeLabel);
-      startTimeGroup.appendChild(startTimeInput);
-
-      grid2.appendChild(startDateGroup);
-      grid2.appendChild(startTimeGroup);
-      card.appendChild(grid2);
-
-      const grid3 = document.createElement('div');
-      grid3.className = 'status-edit-grid';
-
-      const endDateGroup = document.createElement('div');
-      endDateGroup.className = 'form-group';
-      const endDateLabel = document.createElement('label');
-      endDateLabel.className = 'form-label';
-      endDateLabel.textContent = 'End Date';
-      const endDateInput = document.createElement('input');
-      endDateInput.type = 'date';
-      endDateInput.className = 'form-input numeric-lock';
-      endDateInput.setAttribute('dir', 'ltr');
-      endDateInput.required = true;
-      endDateInput.value = leg.endDate || '';
-      endDateInput.addEventListener('change', () => {
-        leg.endDate = endDateInput.value;
-      });
-      endDateGroup.appendChild(endDateLabel);
-      endDateGroup.appendChild(endDateInput);
-
-      const endTimeGroup = document.createElement('div');
-      endTimeGroup.className = 'form-group';
-      const endTimeLabel = document.createElement('label');
-      endTimeLabel.className = 'form-label';
-      endTimeLabel.textContent = 'End Time (Optional)';
-      const endTimeInput = document.createElement('input');
-      endTimeInput.type = 'time';
-      endTimeInput.className = 'form-input numeric-lock';
-      endTimeInput.setAttribute('dir', 'ltr');
-      endTimeInput.value = leg.endTime || '';
-      endTimeInput.addEventListener('change', () => {
-        leg.endTime = endTimeInput.value;
-      });
-      endTimeGroup.appendChild(endTimeLabel);
-      endTimeGroup.appendChild(endTimeInput);
-
-      grid3.appendChild(endDateGroup);
-      grid3.appendChild(endTimeGroup);
-      card.appendChild(grid3);
-
-      this.dom.tlLegsList.appendChild(card);
-
-      if (targetLegId && leg.id === targetLegId) {
-        setTimeout(() => {
-          card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 60);
-      }
-    });
   }
 
   /**
    * Opens the timeline editor bottom sheet, populating existing data if provided.
    * @param {import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter | null} [item]
-   * @param {string | null} [targetLegId]
    */
-  openTimelineItemEditor(item = null, targetLegId = null) {
+  openTimelineItemEditor(item = null) {
     if (!this.#tripConfig) return;
     if (this.dom.timelineItemSheet) this.dom.timelineItemSheet.hidden = false;
 
@@ -1197,56 +979,31 @@ export class CountdownBoardApp {
 
       if (this.dom.tlTitleInput) this.dom.tlTitleInput.value = '';
       if (this.dom.tlDateInput) this.dom.tlDateInput.value = new Date().toISOString().slice(0, 10);
-      if (this.dom.tlTimeInput) this.dom.tlTimeInput.value = '';
       if (this.dom.tlPersonSelect) this.dom.tlPersonSelect.value = 'both';
       if (this.dom.tlCountrySelect) this.dom.tlCountrySelect.value = this.#tripConfig.homeCountryCode || 'US';
       if (this.dom.tlDetailsInput) this.dom.tlDetailsInput.value = '';
 
       if (this.dom.tlChapterTitleInput) this.dom.tlChapterTitleInput.value = '';
-      if (this.dom.tlChapterEmojiInput) this.dom.tlChapterEmojiInput.value = '🌺';
+      if (this.dom.tlChapterEmojiInput) this.dom.tlChapterEmojiInput.value = '✈️';
+      if (this.dom.tlChapterCountrySelect) this.dom.tlChapterCountrySelect.value = this.#tripConfig.homeCountryCode || 'US';
+      if (this.dom.tlStartDateInput) this.dom.tlStartDateInput.value = new Date().toISOString().slice(0, 10);
+      if (this.dom.tlEndDateInput) this.dom.tlEndDateInput.value = new Date().toISOString().slice(0, 10);
       if (this.dom.tlChapterDescInput) this.dom.tlChapterDescInput.value = '';
-
-      const today = new Date().toISOString().slice(0, 10);
-      this.editingChapterLegs = [
-        {
-          id: `leg-${Date.now()}`,
-          countryCode: this.#tripConfig.homeCountryCode || 'US',
-          label: '',
-          startDate: today,
-          endDate: today,
-          startTime: '',
-          endTime: ''
-        }
-      ];
-      this.renderChapterLegsEditor();
 
       if (this.dom.tlDeleteBtn) this.dom.tlDeleteBtn.style.display = 'none';
       this.setTimelineEditorMode('milestone');
     } else if (isReunionChapter(item)) {
-      if (this.dom.timelineSheetTitle) this.dom.timelineSheetTitle.textContent = 'Edit Chapter & Route';
+      if (this.dom.timelineSheetTitle) this.dom.timelineSheetTitle.textContent = 'Edit Chapter';
       if (this.dom.timelineTypeToggleGroup) this.dom.timelineTypeToggleGroup.style.display = 'none';
       if (this.dom.tlItemIdInput) this.dom.tlItemIdInput.value = item.id;
 
       if (this.dom.tlChapterTitleInput) this.dom.tlChapterTitleInput.value = item.title || '';
-      if (this.dom.tlChapterEmojiInput) this.dom.tlChapterEmojiInput.value = item.emoji || '🌺';
+      if (this.dom.tlChapterEmojiInput) this.dom.tlChapterEmojiInput.value = item.emoji || '✈️';
+      const legCountry = item.legs?.[0]?.countryCode || this.#tripConfig.homeCountryCode || 'US';
+      if (this.dom.tlChapterCountrySelect) this.dom.tlChapterCountrySelect.value = legCountry;
+      if (this.dom.tlStartDateInput) this.dom.tlStartDateInput.value = item.startDate || '';
+      if (this.dom.tlEndDateInput) this.dom.tlEndDateInput.value = item.endDate || '';
       if (this.dom.tlChapterDescInput) this.dom.tlChapterDescInput.value = item.description || '';
-
-      const today = new Date().toISOString().slice(0, 10);
-      this.editingChapterLegs = Array.isArray(item.legs) && item.legs.length > 0
-        ? JSON.parse(JSON.stringify(item.legs))
-        : [
-            {
-              id: `${item.id}-leg-1`,
-              countryCode: this.#tripConfig.homeCountryCode || 'US',
-              label: item.title || '',
-              startDate: item.startDate || today,
-              endDate: item.endDate || today,
-              startTime: '',
-              endTime: ''
-            }
-          ];
-
-      this.renderChapterLegsEditor(targetLegId);
 
       if (this.dom.tlDeleteBtn) this.dom.tlDeleteBtn.style.display = 'block';
       this.setTimelineEditorMode('chapter');
@@ -1257,7 +1014,6 @@ export class CountdownBoardApp {
 
       if (this.dom.tlTitleInput) this.dom.tlTitleInput.value = item.title || '';
       if (this.dom.tlDateInput) this.dom.tlDateInput.value = item.date || '';
-      if (this.dom.tlTimeInput) this.dom.tlTimeInput.value = item.time || '';
       if (this.dom.tlPersonSelect) this.dom.tlPersonSelect.value = item.person || 'both';
       if (this.dom.tlCountrySelect) this.dom.tlCountrySelect.value = item.countryCode || this.#tripConfig.homeCountryCode || 'US';
       if (this.dom.tlDetailsInput) this.dom.tlDetailsInput.value = item.details || '';
@@ -1303,8 +1059,10 @@ export class CountdownBoardApp {
     let emoji = '';
     let title = '';
     let datePillText = '';
+    let locationText = '';
     let targetStartMs = 0;
     let targetEndMs = 0;
+    let subtext = '';
 
     if (isChapter) {
       emoji = item.emoji || '🌺';
@@ -1316,128 +1074,31 @@ export class CountdownBoardApp {
       const lastLeg = item.legs?.[item.legs.length - 1];
       const endCountry = lastLeg ? getCountryInfo(lastLeg.countryCode) : startCountry;
 
-      const [startH, startM] = parseTimeParts(firstLeg?.startTime, 0, 0);
-      targetStartMs = firstLeg?.startTime
-        ? getZonedWallClockEpochMs(item.startDate, startCountry.timeZone, startH, startM, 0, 0)
-        : getStartOfDayInTimeZoneMs(item.startDate, startCountry.timeZone);
+      targetStartMs = getStartOfDayInTimeZoneMs(item.startDate, startCountry.timeZone);
+      targetEndMs = getEndOfDayInTimeZoneMs(item.endDate, endCountry.timeZone);
 
-      const [endH, endM] = parseTimeParts(lastLeg?.endTime, 23, 59);
-      targetEndMs = lastLeg?.endTime
-        ? getZonedWallClockEpochMs(item.endDate, endCountry.timeZone, endH, endM, 59, 999)
-        : getEndOfDayInTimeZoneMs(item.endDate, endCountry.timeZone);
+      const countryNames = item.legs?.map((l) => {
+        const c = getCountryInfo(l.countryCode);
+        return `${c.flag} ${l.label || c.name}`;
+      }).join(' • ') || `${startCountry.flag} ${startCountry.name}`;
 
-      if (this.dom.eventModalCountries) {
-        this.dom.eventModalCountries.replaceChildren();
-        item.legs?.forEach((leg, idx) => {
-          const legCountry = getCountryInfo(leg.countryCode);
-          const chip = document.createElement('div');
-          chip.className = 'event-modal-country-chip';
-          chip.setAttribute('role', 'button');
-          chip.setAttribute('tabindex', '0');
-          chip.setAttribute('aria-label', `Edit stop: ${leg.label || legCountry.name}`);
-          chip.title = `Click to edit ${leg.label || legCountry.name}`;
-
-          const flag = document.createElement('span');
-          flag.className = 'event-modal-country-flag';
-          flag.textContent = legCountry.flag;
-
-          const name = document.createElement('span');
-          name.className = 'event-modal-country-name';
-          name.setAttribute('dir', 'auto');
-          name.textContent = leg.label || legCountry.name;
-
-          const timeSuffix = leg.startTime ? ` ${leg.startTime}` : '';
-          const dates = document.createElement('span');
-          dates.className = 'event-modal-country-dates numeric-lock';
-          dates.setAttribute('dir', 'ltr');
-          dates.textContent = `${formatShortDisplayDate(leg.startDate)}${timeSuffix} – ${formatShortDisplayDate(leg.endDate)}`;
-
-          chip.appendChild(flag);
-          chip.appendChild(name);
-          chip.appendChild(dates);
-
-          chip.addEventListener('click', () => {
-            this.closeEventModal();
-            this.openTimelineItemEditor(item, leg.id);
-          });
-          chip.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              this.closeEventModal();
-              this.openTimelineItemEditor(item, leg.id);
-            }
-          });
-
-          this.dom.eventModalCountries.appendChild(chip);
-
-          if (idx < (item.legs?.length ?? 0) - 1) {
-            const arrow = document.createElement('span');
-            arrow.className = 'event-modal-country-arrow';
-            arrow.textContent = '➔';
-            arrow.setAttribute('aria-hidden', 'true');
-            this.dom.eventModalCountries.appendChild(arrow);
-          }
-        });
-        this.dom.eventModalCountries.hidden = false;
-      }
+      locationText = `Reunion Chapter • ${countryNames}`;
+      subtext = item.description || '';
     } else {
       emoji = item.emoji || '✨';
       title = item.title;
       datePillText = formatDisplayDate(item.date);
 
       const countryInfo = item.countryCode ? getCountryInfo(item.countryCode) : getCountryInfo(this.#tripConfig.homeCountryCode || 'US');
-      const [msH, msM] = parseTimeParts(item.time, 0, 0);
-      targetStartMs = item.time
-        ? getZonedWallClockEpochMs(item.date, countryInfo.timeZone, msH, msM, 0, 0)
-        : getStartOfDayInTimeZoneMs(item.date, countryInfo.timeZone);
-      targetEndMs = item.time
-        ? getZonedWallClockEpochMs(item.date, countryInfo.timeZone, msH, msM, 59, 999)
-        : getEndOfDayInTimeZoneMs(item.date, countryInfo.timeZone);
+      targetStartMs = getStartOfDayInTimeZoneMs(item.date, countryInfo.timeZone);
+      targetEndMs = getEndOfDayInTimeZoneMs(item.date, countryInfo.timeZone);
 
       const meta = this.latestBoardState
         ? resolveMilestonePersonMeta(item.person || 'both', this.latestBoardState)
         : { icon: '💕', label: 'Together' };
 
-      if (this.dom.eventModalCountries) {
-        this.dom.eventModalCountries.replaceChildren();
-        const chip = document.createElement('div');
-        chip.className = 'event-modal-country-chip';
-        chip.setAttribute('role', 'button');
-        chip.setAttribute('tabindex', '0');
-        chip.setAttribute('aria-label', `Edit milestone: ${item.title}`);
-        chip.title = 'Click to edit milestone';
-
-        const flag = document.createElement('span');
-        flag.className = 'event-modal-country-flag';
-        flag.textContent = countryInfo.flag;
-
-        const name = document.createElement('span');
-        name.className = 'event-modal-country-name';
-        name.textContent = countryInfo.name;
-
-        const tag = document.createElement('span');
-        tag.className = 'event-modal-country-dates';
-        tag.textContent = `${meta.icon} ${meta.label}${item.time ? ` ⏰ ${item.time}` : ''}`;
-
-        chip.appendChild(flag);
-        chip.appendChild(name);
-        chip.appendChild(tag);
-
-        chip.addEventListener('click', () => {
-          this.closeEventModal();
-          this.openTimelineItemEditor(item);
-        });
-        chip.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            this.closeEventModal();
-            this.openTimelineItemEditor(item);
-          }
-        });
-
-        this.dom.eventModalCountries.appendChild(chip);
-        this.dom.eventModalCountries.hidden = false;
-      }
+      locationText = `${countryInfo.flag} ${countryInfo.name} • ${meta.icon} ${meta.label}`;
+      subtext = item.details || '';
     }
 
     if (this.dom.eventModalBadge) this.dom.eventModalBadge.textContent = emoji;
@@ -1445,7 +1106,7 @@ export class CountdownBoardApp {
     if (this.dom.eventModalDatePill) {
       this.dom.eventModalDatePill.replaceChildren(createPhotoDateElement(datePillText, { isCompact: true }));
     }
-    if (this.dom.eventModalLocation) this.dom.eventModalLocation.hidden = true;
+    if (this.dom.eventModalLocation) this.dom.eventModalLocation.textContent = locationText;
     if (this.dom.eventModalSubtext) {
       this.dom.eventModalSubtext.textContent = '';
       this.dom.eventModalSubtext.hidden = true;

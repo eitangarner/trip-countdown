@@ -131,22 +131,6 @@ export function getUtcOffsetMinutes(epochMs, timeZone) {
 }
 
 /**
- * Parses "HH:MM" 24h time string into [hour, minute], with fallback defaults.
- * @param {string | undefined | null} timeStr
- * @param {number} [defaultHour=0]
- * @param {number} [defaultMinute=0]
- * @returns {[number, number]}
- */
-export function parseTimeParts(timeStr, defaultHour = 0, defaultMinute = 0) {
-  if (!timeStr || typeof timeStr !== 'string') return [defaultHour, defaultMinute];
-  const [h, m] = timeStr.split(':').map((v) => parseInt(v, 10));
-  return [
-    Number.isFinite(h) && h >= 0 && h < 24 ? h : defaultHour,
-    Number.isFinite(m) && m >= 0 && m < 60 ? m : defaultMinute
-  ];
-}
-
-/**
  * Converts a local wall-clock time on dateStr ("YYYY-MM-DD") in timeZone to exact epoch milliseconds.
  * Uses a two-pass offset calculation to handle DST transitions cleanly.
  * @param {string} dateStr
@@ -157,7 +141,7 @@ export function parseTimeParts(timeStr, defaultHour = 0, defaultMinute = 0) {
  * @param {number} ms
  * @returns {number}
  */
-export function getZonedWallClockEpochMs(dateStr, timeZone, hour, minute, second, ms) {
+function getZonedWallClockEpochMs(dateStr, timeZone, hour, minute, second, ms) {
   const { year, month, day } = parseIsoDateParts(dateStr);
   const naiveUtcMs = Date.UTC(year, month - 1, day, hour, minute, second, ms);
   const firstOffsetMin = getUtcOffsetMinutes(naiveUtcMs, timeZone);
@@ -448,24 +432,14 @@ export function getReunionDurationDays(reunion) {
 function resolveReunionWindows(reunion) {
   const legWindows = reunion.legs.map((leg, index) => {
     const legCountry = resolveCountry(leg.countryCode);
-    const [startH, startM] = parseTimeParts(leg.startTime, 0, 0);
-    const startMs = leg.startTime
-      ? getZonedWallClockEpochMs(leg.startDate, legCountry.timeZone, startH, startM, 0, 0)
-      : getStartOfDayInTimeZoneMs(leg.startDate, legCountry.timeZone);
-
+    const startMs = getStartOfDayInTimeZoneMs(leg.startDate, legCountry.timeZone);
     let endMs;
     if (index < reunion.legs.length - 1) {
       const nextLeg = reunion.legs[index + 1];
       const nextCountry = resolveCountry(nextLeg.countryCode);
-      const [nextH, nextM] = parseTimeParts(nextLeg.startTime, 0, 0);
-      endMs = nextLeg.startTime
-        ? getZonedWallClockEpochMs(nextLeg.startDate, nextCountry.timeZone, nextH, nextM, 0, 0) - 1
-        : getStartOfDayInTimeZoneMs(nextLeg.startDate, nextCountry.timeZone) - 1;
+      endMs = getStartOfDayInTimeZoneMs(nextLeg.startDate, nextCountry.timeZone) - 1;
     } else {
-      const [endH, endM] = parseTimeParts(leg.endTime, 23, 59);
-      endMs = leg.endTime
-        ? getZonedWallClockEpochMs(leg.endDate, legCountry.timeZone, endH, endM, 59, 999)
-        : getEndOfDayInTimeZoneMs(leg.endDate, legCountry.timeZone);
+      endMs = getEndOfDayInTimeZoneMs(leg.endDate, legCountry.timeZone);
     }
     return {
       leg,
@@ -559,11 +533,7 @@ export function evaluateBoardState(config, liveState = null, nowMs) {
       const override = chapterOverrides[rc.id];
       if (!override) return rc;
       const updated = { ...rc, ...override };
-      if (Array.isArray(override.legs) && override.legs.length > 0) {
-        updated.legs = override.legs;
-        updated.startDate = override.legs[0].startDate;
-        updated.endDate = override.legs[override.legs.length - 1].endDate;
-      } else if (override.countryCode && Array.isArray(updated.legs) && updated.legs.length > 0) {
+      if (override.countryCode && Array.isArray(updated.legs) && updated.legs.length > 0) {
         updated.legs = updated.legs.map((leg, index) =>
           index === 0 ? { ...leg, countryCode: override.countryCode } : leg
         );
@@ -897,13 +867,8 @@ export function evaluateBoardState(config, liveState = null, nowMs) {
   const timelineDescriptors = [
     ...allMilestones.map((ms) => {
       const msCountry = resolveCountry(ms.countryCode || config.homeCountryCode);
-      const [msH, msM] = parseTimeParts(ms.time, 0, 0);
-      const startMs = ms.time
-        ? getZonedWallClockEpochMs(ms.date, msCountry.timeZone, msH, msM, 0, 0)
-        : getStartOfDayInTimeZoneMs(ms.date, msCountry.timeZone);
-      const endMs = ms.time
-        ? getZonedWallClockEpochMs(ms.date, msCountry.timeZone, msH, msM, 59, 999)
-        : getEndOfDayInTimeZoneMs(ms.date, msCountry.timeZone);
+      const startMs = getStartOfDayInTimeZoneMs(ms.date, msCountry.timeZone);
+      const endMs = getEndOfDayInTimeZoneMs(ms.date, msCountry.timeZone);
       return {
         item: ms,
         sortDate: ms.date,

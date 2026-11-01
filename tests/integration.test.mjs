@@ -545,10 +545,7 @@ test('Integration: index.html contains Timeline Header Add Button, Update Status
   assert.ok(html.includes('id="timeline-type-chapter-btn"'));
   assert.ok(html.includes('id="tl-item-id-input"'));
   assert.ok(html.includes('id="timeline-milestone-fields"'));
-  assert.ok(html.includes('id="tl-time-input"'));
   assert.ok(html.includes('id="timeline-chapter-fields"'));
-  assert.ok(html.includes('id="tl-add-leg-btn"'));
-  assert.ok(html.includes('id="tl-legs-list"'));
   assert.ok(html.includes('id="tl-save-btn"'));
   assert.ok(html.includes('id="tl-delete-btn"'));
 
@@ -561,117 +558,5 @@ test('Integration: index.html contains Timeline Header Add Button, Update Status
   assert.ok(html.includes('id="event-cd-minutes"'));
   assert.ok(html.includes('id="event-cd-seconds"'));
   assert.ok(html.includes('id="event-modal-edit-btn"'));
-  assert.ok(html.includes('id="event-modal-title-edit-btn"'));
-  assert.ok(html.includes('id="event-modal-countries"'));
   assert.ok(html.includes('id="event-modal-date-pill"'));
-});
-
-test('Integration: TimelineRenderer renders route-map country chips and triggers onEditLeg directly', async () => {
-  const { TimelineRenderer } = await import('../js/timeline-renderer.js');
-  const prevDoc = globalThis.document;
-
-  try {
-    class FakeElement {
-      constructor(tag = 'div') {
-        this.tagName = tag.toUpperCase();
-        this.className = '';
-        this.children = [];
-        this.textContent = '';
-        this.innerHTML = '';
-        this.hidden = false;
-        this.dataset = {};
-        this.attributes = {};
-        this.listeners = {};
-      }
-      appendChild(child) {
-        this.children.push(child);
-        return child;
-      }
-      setAttribute(k, v) { this.attributes[k] = String(v); }
-      getAttribute(k) { return this.attributes[k] ?? null; }
-      addEventListener(event, fn) { this.listeners[event] = fn; }
-      replaceChildren(...newChildren) { this.children = [...newChildren]; }
-      classList = {
-        add: (...cls) => { this.className += ' ' + cls.join(' '); },
-        remove: (...cls) => {
-          for (const c of cls) {
-            this.className = this.className.replace(new RegExp(`\\b${c}\\b`, 'g'), '').trim();
-          }
-        },
-        toggle: (c, force) => {
-          if (force === undefined) force = !this.className.includes(c);
-          if (force) this.classList.add(c); else this.classList.remove(c);
-          return force;
-        }
-      };
-    }
-
-    globalThis.document = {
-      createElement: (tag) => new FakeElement(tag)
-    };
-
-    const container = new FakeElement('div');
-    let editedLegTarget = null;
-    let editedItemTarget = null;
-
-    const renderer = new TimelineRenderer({
-      statsPillEl: null,
-      pastToggleBtn: null,
-      pastDrawerEl: null,
-      upcomingTrackEl: container,
-      onEditItem: (item) => { editedItemTarget = item; },
-      onEditLeg: (reunion, leg) => { editedLegTarget = { reunion, leg }; }
-    });
-
-    const testReunion = {
-      id: 'reunion-multi',
-      title: 'Asian Discovery',
-      emoji: '🌸',
-      startDate: '2026-03-10',
-      endDate: '2026-03-25',
-      legs: [
-        { id: 'leg-sg', countryCode: 'SG', label: 'Singapore', startDate: '2026-03-10', endDate: '2026-03-15' },
-        { id: 'leg-jp', countryCode: 'JP', label: 'Japan', startDate: '2026-03-15', endDate: '2026-03-25' }
-      ]
-    };
-
-    const boardState = {
-      nowMs: Date.parse('2026-01-01T00:00:00Z'),
-      activeReunion: null,
-      timeline: {
-        plannedTripDaysTogether: 16,
-        completedTripDaysTogether: 0,
-        pastItems: [],
-        upcomingItems: [testReunion]
-      }
-    };
-
-    renderer.render(boardState);
-
-    // Verify reunion card rendered
-    assert.equal(container.children.length, 1);
-    const card = container.children[0];
-
-    // Card contains header (child 0) and chips wrapper (child 1)
-    const chipsWrapper = card.children[1];
-    assert.ok(chipsWrapper);
-    assert.equal(chipsWrapper.className, 'reunion-leg-chips-wrapper');
-
-    const scroller = chipsWrapper.children[0];
-    assert.equal(scroller.className, 'reunion-leg-chips');
-
-    // Children in scroller: chip 1, arrow, chip 2
-    assert.equal(scroller.children.length, 3);
-    const sgChip = scroller.children[0];
-    assert.equal(sgChip.dataset.legId, 'leg-sg');
-
-    // Clicking individual country chip directly calls onEditLeg
-    let stopped = false;
-    sgChip.listeners['click']({ stopPropagation() { stopped = true; } });
-    assert.ok(stopped, 'Clicking leg chip should stop propagation to card');
-    assert.equal(editedLegTarget?.leg.id, 'leg-sg');
-    assert.equal(editedItemTarget, null, 'Clicking leg chip should not fire onEditItem');
-  } finally {
-    globalThis.document = prevDoc;
-  }
 });

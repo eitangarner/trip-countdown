@@ -359,19 +359,13 @@
             <input type="date" class="form-input numeric-lock" id="tl-date-input" dir="ltr" required />
           </div>
           <div class="form-group">
-            <label class="form-label" for="tl-time-input">Time (Optional)</label>
-            <input type="time" class="form-input numeric-lock" id="tl-time-input" dir="ltr" />
-          </div>
-        </div>
-        <div class="status-edit-grid">
-          <div class="form-group">
             <label class="form-label" for="tl-person-select">Who</label>
             <select class="form-select" id="tl-person-select"></select>
           </div>
-          <div class="form-group">
-            <label class="form-label" for="tl-country-select">Country</label>
-            <select class="form-select" id="tl-country-select"></select>
-          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="tl-country-select">Country</label>
+          <select class="form-select" id="tl-country-select"></select>
         </div>
         <div class="form-group">
           <label class="form-label" for="tl-details-input">Note / Details (Optional)</label>
@@ -388,37 +382,44 @@
 
       <!-- Chapter / Leg Fields -->
       <div id="timeline-chapter-fields" hidden>
+        <div class="form-group">
+          <label class="form-label" for="tl-chapter-title-input">Chapter Title</label>
+          <input
+            type="text"
+            class="form-input"
+            id="tl-chapter-title-input"
+            dir="auto"
+            placeholder="e.g. Thailand Reunion"
+            maxlength="80"
+          />
+        </div>
         <div class="status-edit-grid">
-          <div class="form-group" style="flex: 3;">
-            <label class="form-label" for="tl-chapter-title-input">Chapter Title</label>
-            <input
-              type="text"
-              class="form-input"
-              id="tl-chapter-title-input"
-              dir="auto"
-              placeholder="e.g. Together Across 3 Countries"
-              maxlength="80"
-            />
-          </div>
-          <div class="form-group" style="flex: 1;">
+          <div class="form-group">
             <label class="form-label" for="tl-chapter-emoji-input">Emoji</label>
             <input
               type="text"
               class="form-input"
               id="tl-chapter-emoji-input"
-              placeholder="🌸"
+              placeholder="🌺"
               maxlength="4"
             />
           </div>
+          <div class="form-group">
+            <label class="form-label" for="tl-chapter-country-select">Country</label>
+            <select class="form-select" id="tl-chapter-country-select"></select>
+          </div>
         </div>
-
-        <div class="legs-section-header">
-          <span class="form-label" style="margin-bottom: 0;">Country Route &amp; Legs</span>
-          <button type="button" class="btn-add-leg" id="tl-add-leg-btn">+ Add Country</button>
+        <div class="status-edit-grid">
+          <div class="form-group">
+            <label class="form-label" for="tl-start-date-input">Start Date</label>
+            <input type="date" class="form-input numeric-lock" id="tl-start-date-input" dir="ltr" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tl-end-date-input">End Date</label>
+            <input type="date" class="form-input numeric-lock" id="tl-end-date-input" dir="ltr" />
+          </div>
         </div>
-        <div class="legs-list-container" id="tl-legs-list"></div>
-
-        <div class="form-group" style="margin-block-start: 12px;">
+        <div class="form-group">
           <label class="form-label" for="tl-chapter-desc-input">Description / Notes (Optional)</label>
           <input
             type="text"
@@ -467,12 +468,8 @@
         <span class="timeline-date-pill numeric-lock" id="event-modal-date-pill" dir="ltr"></span>
       </div>
 
-      <div class="event-modal-title-row">
-        <h2 class="event-modal-title" id="event-modal-title" dir="auto"></h2>
-        <button type="button" class="event-modal-title-edit-btn" id="event-modal-title-edit-btn" aria-label="Edit name" title="Edit name">✏️</button>
-      </div>
-      <div class="event-modal-countries" id="event-modal-countries" role="list"></div>
-      <p class="event-modal-location" id="event-modal-location" hidden></p>
+      <h2 class="event-modal-title" id="event-modal-title" dir="auto"></h2>
+      <p class="event-modal-location" id="event-modal-location"></p>
 
       <div class="countdown-grid numeric-lock" id="event-modal-countdown-grid" dir="ltr" role="timer" aria-live="polite">
         <div class="countdown-unit">
