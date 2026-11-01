@@ -493,9 +493,10 @@ export function extractLuminousPalette(imageSource) {
  * Creates an elegant calendar-sheet date badge with separate "pages" for day, month, and year.
  * If dateLabel does not match a standard calendar date, returns a fallback single pill.
  * @param {string} dateLabel
+ * @param {{ isCompact?: boolean }} [options]
  * @returns {HTMLElement}
  */
-export function createPhotoDateElement(dateLabel) {
+export function createPhotoDateElement(dateLabel, { isCompact = false } = {}) {
   const dmyMatch = dateLabel.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
   const ymdMatch = dateLabel.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
 
@@ -515,36 +516,31 @@ export function createPhotoDateElement(dateLabel) {
 
   if (!day || !month || !year) {
     const singlePill = document.createElement('div');
-    singlePill.className = 'photo-date-pill numeric-lock';
+    singlePill.className = `${isCompact ? 'timeline-date-pill' : 'photo-date-pill'} numeric-lock`;
     singlePill.setAttribute('dir', 'ltr');
     singlePill.textContent = dateLabel;
     return singlePill;
   }
 
   const pagesContainer = document.createElement('div');
-  pagesContainer.className = 'photo-date-pages numeric-lock';
+  pagesContainer.className = `${isCompact ? 'photo-date-pages date-pages-compact' : 'photo-date-pages'} numeric-lock`;
   pagesContainer.setAttribute('dir', 'ltr');
   pagesContainer.setAttribute('aria-label', `Date: ${day}-${month}-${year}`);
 
   const units = [
-    { label: 'DAY', val: day, cls: 'date-page-day' },
-    { label: 'MONTH', val: month, cls: 'date-page-month' },
-    { label: 'YEAR', val: year, cls: 'date-page-year' }
+    { val: day, cls: 'date-page-day' },
+    { val: month, cls: 'date-page-month' },
+    { val: year, cls: 'date-page-year' }
   ];
 
   for (const unit of units) {
     const page = document.createElement('div');
     page.className = `date-page ${unit.cls}`;
 
-    const header = document.createElement('span');
-    header.className = 'date-page-header';
-    header.textContent = unit.label;
-
     const value = document.createElement('span');
     value.className = 'date-page-value';
     value.textContent = unit.val;
 
-    page.appendChild(header);
     page.appendChild(value);
     pagesContainer.appendChild(page);
   }

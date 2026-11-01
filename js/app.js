@@ -125,7 +125,8 @@ export class CountdownBoardApp {
       pastToggleBtn: this.dom.pastChaptersToggle,
       pastDrawerEl: this.dom.pastChaptersDrawer,
       upcomingTrackEl: this.dom.timelineUpcomingTrack,
-      onEditItem: (item) => this.openTimelineItemEditor(item)
+      onEditItem: (item) => this.openTimelineItemEditor(item),
+      onDeleteItem: (item) => this.deleteTimelineItem(item)
     });
   }
 
@@ -784,59 +785,12 @@ export class CountdownBoardApp {
       this.updateSyncBadge(result.syncedRemotely ? 'synced' : 'pending', 'Successfully updated');
     });
 
-    // 10. Delete Timeline Item
+    // 10. Delete Timeline Item from Editor Sheet
     this.dom.tlDeleteBtn?.addEventListener('click', async () => {
       const id = (this.dom.tlItemIdInput?.value || '').trim();
       if (!id || !this.#tripConfig) return;
-
-      if (this.timelineEditorMode === 'chapter') {
-        const customIdx = (this.liveState.customReunions || []).findIndex((r) => r.id === id);
-        if (customIdx >= 0) {
-          const updated = [...this.liveState.customReunions];
-          updated.splice(customIdx, 1);
-          this.liveState = { ...this.liveState, customReunions: updated };
-        } else {
-          this.liveState = {
-            ...this.liveState,
-            chapterOverrides: {
-              ...(this.liveState.chapterOverrides || {}),
-              [id]: {
-                ...(this.liveState.chapterOverrides?.[id] || {}),
-                hidden: true
-              }
-            }
-          };
-        }
-      } else {
-        const customIdx = (this.liveState.customMilestones || []).findIndex((m) => m.id === id);
-        if (customIdx >= 0) {
-          const updated = [...this.liveState.customMilestones];
-          updated.splice(customIdx, 1);
-          this.liveState = { ...this.liveState, customMilestones: updated };
-        } else {
-          this.liveState = {
-            ...this.liveState,
-            milestoneOverrides: {
-              ...(this.liveState.milestoneOverrides || {}),
-              [id]: {
-                ...(this.liveState.milestoneOverrides?.[id] || {}),
-                hidden: true
-              }
-            }
-          };
-        }
-      }
-
       this.closeTimelineItemEditor();
-      this.tick(true);
-      this.updateSyncBadge('pending', 'Saving…');
-      const result = await saveLiveState(
-        this.liveState,
-        this.#githubToken,
-        this.githubRepo,
-        this.#vaultCryptoKey
-      );
-      this.updateSyncBadge(result.syncedRemotely ? 'synced' : 'pending', 'Successfully updated');
+      await this.deleteTimelineItem({ id, isChapter: this.timelineEditorMode === 'chapter' });
     });
 
     // 8. Lock Device Button
@@ -963,6 +917,7 @@ export class CountdownBoardApp {
    */
   openTimelineItemEditor(item = null) {
     if (!this.#tripConfig) return;
+    if (this.dom.timelineItemSheet) this.dom.timelineItemSheet.hidden = false;
 
     if (item === null) {
       if (this.dom.timelineSheetTitle) this.dom.timelineSheetTitle.textContent = 'Add Timeline Entry';
@@ -1025,6 +980,64 @@ export class CountdownBoardApp {
       this.dom.timelineItemSheet.style.transform = '';
       this.dom.timelineItemSheet.style.transition = '';
     }
+  }
+
+  /**
+   * Deletes or hides a timeline milestone or reunion chapter and syncs live state.
+   * @param {any} item
+   */
+  async deleteTimelineItem(item) {
+    if (!item?.id || !this.#tripConfig) return;
+    const id = item.id;
+    const isChapter = isReunionChapter(item) || item.isChapter;
+
+    if (isChapter) {
+      const customIdx = (this.liveState.customReunions || []).findIndex((r) => r.id === id);
+      if (customIdx >= 0) {
+        const updated = [...this.liveState.customReunions];
+        updated.splice(customIdx, 1);
+        this.liveState = { ...this.liveState, customReunions: updated };
+      } else {
+        this.liveState = {
+          ...this.liveState,
+          chapterOverrides: {
+            ...(this.liveState.chapterOverrides || {}),
+            [id]: {
+              ...(this.liveState.chapterOverrides?.[id] || {}),
+              hidden: true
+            }
+          }
+        };
+      }
+    } else {
+      const customIdx = (this.liveState.customMilestones || []).findIndex((m) => m.id === id);
+      if (customIdx >= 0) {
+        const updated = [...this.liveState.customMilestones];
+        updated.splice(customIdx, 1);
+        this.liveState = { ...this.liveState, customMilestones: updated };
+      } else {
+        this.liveState = {
+          ...this.liveState,
+          milestoneOverrides: {
+            ...(this.liveState.milestoneOverrides || {}),
+            [id]: {
+              ...(this.liveState.milestoneOverrides?.[id] || {}),
+              hidden: true
+            }
+          }
+        };
+      }
+    }
+
+    this.tick(true);
+    this.updateSyncBadge('pending', 'Saving…');
+    const result = await saveLiveState(
+      this.liveState,
+      this.#githubToken,
+      this.githubRepo,
+      this.#vaultCryptoKey
+    );
+    this.updateSyncBadge(result.syncedRemotely ? 'synced' : 'pending', 'Successfully updated');
   }
 
   updateProfileSelectorUI() {

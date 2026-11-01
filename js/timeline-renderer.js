@@ -6,6 +6,7 @@ import {
   getReunionDurationDays,
   getStartOfDayInTimeZoneMs
 } from './countdown-engine.js';
+import { createPhotoDateElement } from './photo-stack.js';
 
 /**
  * Checks whether a timeline item is a ReunionChapter (has legs array) vs a MilestoneEvent.
@@ -40,9 +41,10 @@ export function resolveMilestonePersonMeta(personKey, boardState) {
  * @param {import('./config.js').MilestoneEvent} milestone
  * @param {import('./config.js').EvaluatedBoardState} boardState
  * @param {((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null} [onEditItem]
+ * @param {((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null} [onDeleteItem]
  * @returns {HTMLElement}
  */
-export function createMilestoneRowElement(milestone, boardState, onEditItem = null) {
+export function createMilestoneRowElement(milestone, boardState, onEditItem = null, onDeleteItem = null) {
   const { slot, label, icon } = resolveMilestonePersonMeta(milestone.person || 'both', boardState);
   const row = document.createElement('div');
   row.className = 'milestone-row';
@@ -80,11 +82,8 @@ export function createMilestoneRowElement(milestone, boardState, onEditItem = nu
   const dateCol = document.createElement('div');
   dateCol.className = 'milestone-date-col';
 
-  const dateSpan = document.createElement('span');
-  dateSpan.className = 'milestone-date numeric-lock';
-  dateSpan.setAttribute('dir', 'ltr');
-  dateSpan.textContent = formatDisplayDate(milestone.date);
-  dateCol.appendChild(dateSpan);
+  const datePages = createPhotoDateElement(milestone.date, { isCompact: true });
+  dateCol.appendChild(datePages);
 
   const countryInfo = milestone.countryCode ? getCountryInfo(milestone.countryCode) : null;
   if (countryInfo) {
@@ -94,12 +93,31 @@ export function createMilestoneRowElement(milestone, boardState, onEditItem = nu
     dateCol.appendChild(countryBadge);
   }
 
+  const actionsGroup = document.createElement('div');
+  actionsGroup.className = 'milestone-actions-group';
+
   const personTag = document.createElement('span');
   personTag.className = 'milestone-person-tag';
   personTag.textContent = `${icon} ${label}`;
+  actionsGroup.appendChild(personTag);
+
+  const isCustomEvent = milestone.category === 'custom' || String(milestone.id).startsWith('custom-');
+  if (onDeleteItem && isCustomEvent) {
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'milestone-card-delete-btn';
+    deleteBtn.setAttribute('aria-label', `Delete ${milestone.title}`);
+    deleteBtn.title = 'Delete event';
+    deleteBtn.textContent = '🗑️';
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onDeleteItem(milestone);
+    });
+    actionsGroup.appendChild(deleteBtn);
+  }
 
   metaRow.appendChild(dateCol);
-  metaRow.appendChild(personTag);
+  metaRow.appendChild(actionsGroup);
 
   const titleEl = document.createElement('h4');
   titleEl.className = 'milestone-title';
@@ -108,21 +126,6 @@ export function createMilestoneRowElement(milestone, boardState, onEditItem = nu
 
   body.appendChild(metaRow);
   body.appendChild(titleEl);
-
-  const rawDetails = (milestone.details || '').trim();
-  const isRedundant =
-    !rawDetails ||
-    /^monthly milestone/i.test(rawDetails) ||
-    /^solo backpacking legs underway/i.test(rawDetails) ||
-    /^apart phase #\d begins/i.test(rawDetails);
-
-  if (!isRedundant) {
-    const detailsEl = document.createElement('p');
-    detailsEl.className = 'milestone-details';
-    detailsEl.setAttribute('dir', 'auto');
-    detailsEl.textContent = rawDetails;
-    body.appendChild(detailsEl);
-  }
 
   card.appendChild(emojiBadge);
   card.appendChild(body);
@@ -161,9 +164,10 @@ function resolveLegTimelineStatus(leg, index, allLegs, nowMs, activeLegId) {
  * @param {import('./config.js').ReunionChapter} reunion
  * @param {import('./config.js').EvaluatedBoardState} boardState
  * @param {((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null} [onEditItem]
+ * @param {((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null} [onDeleteItem]
  * @returns {HTMLElement}
  */
-function createReunionCardElement(reunion, boardState, onEditItem = null) {
+function createReunionCardElement(reunion, boardState, onEditItem = null, onDeleteItem = null) {
   const isActiveReunion = boardState.activeReunion?.reunion.id === reunion.id;
   const activeLegId = isActiveReunion ? boardState.activeReunion?.activeLeg.id ?? null : null;
 
@@ -218,17 +222,28 @@ function createReunionCardElement(reunion, boardState, onEditItem = null) {
     ? `Day ${boardState.activeReunion.dayOfReunion} of ${totalDays}`
     : `${totalDays} Days Together`;
 
-  header.appendChild(titleGroup);
-  header.appendChild(durationPill);
-  card.appendChild(header);
+  const headerActions = document.createElement('div');
+  headerActions.className = 'milestone-actions-group';
+  headerActions.appendChild(durationPill);
 
-  if (reunion.description) {
-    const descEl = document.createElement('p');
-    descEl.className = 'reunion-description';
-    descEl.setAttribute('dir', 'auto');
-    descEl.textContent = reunion.description;
-    card.appendChild(descEl);
+  const isCustomChapter = String(reunion.id).startsWith('custom-');
+  if (onDeleteItem && isCustomChapter) {
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'reunion-card-delete-btn';
+    deleteBtn.setAttribute('aria-label', `Delete ${reunion.title}`);
+    deleteBtn.title = 'Delete chapter';
+    deleteBtn.textContent = '🗑️';
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onDeleteItem(reunion);
+    });
+    headerActions.appendChild(deleteBtn);
   }
+
+  header.appendChild(titleGroup);
+  header.appendChild(headerActions);
+  card.appendChild(header);
 
   if (Array.isArray(reunion.legs) && reunion.legs.length > 0) {
     const stepper = document.createElement('div');
@@ -291,15 +306,16 @@ function createReunionCardElement(reunion, boardState, onEditItem = null) {
  * @param {import('./config.js').EvaluatedBoardState} boardState
  * @param {HTMLElement} targetContainer
  * @param {((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null} [onEditItem]
+ * @param {((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null} [onDeleteItem]
  */
-function renderChronologicalSequence(items, boardState, targetContainer, onEditItem = null) {
+function renderChronologicalSequence(items, boardState, targetContainer, onEditItem = null, onDeleteItem = null) {
   targetContainer.innerHTML = '';
 
   items.forEach((item) => {
     if (isReunionChapter(item)) {
-      targetContainer.appendChild(createReunionCardElement(item, boardState, onEditItem));
+      targetContainer.appendChild(createReunionCardElement(item, boardState, onEditItem, onDeleteItem));
     } else {
-      targetContainer.appendChild(createMilestoneRowElement(item, boardState, onEditItem));
+      targetContainer.appendChild(createMilestoneRowElement(item, boardState, onEditItem, onDeleteItem));
     }
   });
 }
@@ -314,7 +330,8 @@ export class TimelineRenderer {
    *   pastToggleBtn: HTMLButtonElement | null,
    *   pastDrawerEl: HTMLElement | null,
    *   upcomingTrackEl: HTMLElement | null,
-   *   onEditItem?: ((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null
+   *   onEditItem?: ((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null,
+   *   onDeleteItem?: ((item: import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter) => void) | null
    * }} elements
    */
   constructor(elements) {
@@ -323,6 +340,7 @@ export class TimelineRenderer {
     this.pastDrawerEl = elements.pastDrawerEl;
     this.upcomingTrackEl = elements.upcomingTrackEl;
     this.onEditItem = elements.onEditItem || null;
+    this.onDeleteItem = elements.onDeleteItem || null;
     this.isPastDrawerOpen = false;
 
     if (this.pastToggleBtn && this.pastDrawerEl) {
@@ -382,12 +400,12 @@ export class TimelineRenderer {
         const arrow = this.isPastDrawerOpen ? '▴' : '▾';
         this.pastToggleBtn.innerHTML = `Completed Chapters (<span class="numeric-lock" dir="ltr">${pastItems.length}</span>) ${arrow}`;
         this.syncPastDrawerVisibility();
-        renderChronologicalSequence(pastItems, boardState, this.pastDrawerEl, this.onEditItem);
+        renderChronologicalSequence(pastItems, boardState, this.pastDrawerEl, this.onEditItem, this.onDeleteItem);
       }
     }
 
     if (this.upcomingTrackEl) {
-      renderChronologicalSequence(upcomingItems, boardState, this.upcomingTrackEl, this.onEditItem);
+      renderChronologicalSequence(upcomingItems, boardState, this.upcomingTrackEl, this.onEditItem, this.onDeleteItem);
     }
   }
 }

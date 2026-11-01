@@ -295,21 +295,22 @@ test('Integration: createPhotoDateElement splits DD-MM-YYYY into day, month, and
     assert.equal(pagesEl.className, 'photo-date-pages numeric-lock');
     assert.equal(pagesEl.children.length, 3);
     assert.equal(pagesEl.children[0].className, 'date-page date-page-day');
-    assert.equal(pagesEl.children[0].children[0].textContent, 'DAY');
-    assert.equal(pagesEl.children[0].children[1].textContent, '05');
+    assert.equal(pagesEl.children[0].children[0].textContent, '05');
 
     assert.equal(pagesEl.children[1].className, 'date-page date-page-month');
-    assert.equal(pagesEl.children[1].children[0].textContent, 'MONTH');
-    assert.equal(pagesEl.children[1].children[1].textContent, '10');
+    assert.equal(pagesEl.children[1].children[0].textContent, '10');
 
     assert.equal(pagesEl.children[2].className, 'date-page date-page-year');
-    assert.equal(pagesEl.children[2].children[0].textContent, 'YEAR');
-    assert.equal(pagesEl.children[2].children[1].textContent, '2026');
+    assert.equal(pagesEl.children[2].children[0].textContent, '2026');
 
     // Fallback for non-calendar labels like Chapter 01
     const pillEl = /** @type {any} */ (createPhotoDateElement('Chapter 01'));
     assert.equal(pillEl.className, 'photo-date-pill numeric-lock');
     assert.equal(pillEl.textContent, 'Chapter 01');
+
+    // Compact mode for timeline cards
+    const compactPages = /** @type {any} */ (createPhotoDateElement('15-12-2026', { isCompact: true }));
+    assert.ok(compactPages.className.includes('date-pages-compact'));
   } finally {
     globalThis.document = prevDoc;
   }
@@ -368,11 +369,13 @@ test('Integration: resolveMilestonePersonMeta assigns person icons (🌸, 🌊, 
       countryCode: 'IL'
     };
 
+    let deletedItem = null;
     const row = /** @type {any} */ (
       createMilestoneRowElement(
         milestoneWithRedundantText,
         fakeBoardState,
-        (item) => { clickedItem = item; }
+        (item) => { clickedItem = item; },
+        (item) => { deletedItem = item; }
       )
     );
 
@@ -388,13 +391,45 @@ test('Integration: resolveMilestonePersonMeta assigns person icons (🌸, 🌊, 
     const body = card.children[1];
     const metaRow = body.children[0];
     const countryCol = metaRow.children[0];
-    const personTag = metaRow.children[1];
+    const actionsGroup = metaRow.children[1];
+    const personTag = actionsGroup.children[0];
 
     assert.equal(personTag.textContent, '💕 Together');
     assert.equal(countryCol.children[1].textContent, '🇮🇱 Israel');
 
-    // Redundant 'Monthly milestone...' details text must be suppressed from body
-    assert.equal(body.children.length, 2); // only metaRow and titleEl, no detailsEl
+    // All details/subtitle text must be completely omitted from body (only metaRow and titleEl)
+    assert.equal(body.children.length, 2);
+
+    // Test custom added event renders delete trash button
+    const customEvent = {
+      id: 'custom-event-123',
+      date: '2026-05-01',
+      category: 'custom',
+      emoji: '🎒',
+      title: 'Backpack Buy',
+      person: 'partnerA',
+      countryCode: 'IL'
+    };
+
+    let customDeleted = null;
+    const customRow = /** @type {any} */ (
+      createMilestoneRowElement(
+        customEvent,
+        fakeBoardState,
+        null,
+        (item) => { customDeleted = item; }
+      )
+    );
+    const customCard = customRow.children[0];
+    const customActionsGroup = customCard.children[1].children[0].children[1];
+    const deleteBtn = customActionsGroup.children[1];
+    assert.ok(deleteBtn);
+    assert.equal(deleteBtn.className, 'milestone-card-delete-btn');
+    assert.equal(deleteBtn.textContent, '🗑️');
+
+    // Clicking delete button calls onDeleteItem
+    deleteBtn.listeners['click']({ stopPropagation() {} });
+    assert.equal(customDeleted?.id, 'custom-event-123');
   } finally {
     globalThis.document = prevDoc;
   }
