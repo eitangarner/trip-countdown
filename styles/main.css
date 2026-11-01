@@ -2580,19 +2580,27 @@ main {
   }
 }
 
+.event-modal .sheet-close-btn {
+  position: absolute;
+  inset-block-start: 18px;
+  inset-inline-end: 18px;
+  z-index: 2;
+}
+
 .event-modal-header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
 }
 
 .event-modal-title-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
-  flex: 1;
-  min-width: 0;
+  text-align: center;
+  flex-wrap: wrap;
 }
 
 .event-modal-badge {
@@ -2605,14 +2613,18 @@ main {
 .event-modal-content {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 16px;
+  width: 100%;
 }
 
 .event-modal-meta {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .event-modal-status-pill {
@@ -2640,8 +2652,8 @@ main {
   color: var(--ink-primary);
   letter-spacing: -0.02em;
   line-height: 1.25;
-  min-width: 0;
-  overflow-wrap: break-word;
+  text-align: center;
+  margin: 0;
 }
 
 .event-modal-travel-tag {
@@ -2668,6 +2680,8 @@ main {
 .event-modal-location {
   display: flex;
   align-items: center;
+  justify-content: center;
+  text-align: center;
   gap: 6px;
   font-size: 0.82rem;
   font-weight: 600;
