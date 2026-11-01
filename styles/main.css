@@ -1457,90 +1457,76 @@ main {
   gap: 14px;
 }
 
-.timeline-add-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 34px;
-  padding-block: 0;
-  padding-inline: 13px;
-  box-sizing: border-box;
-  border-radius: var(--radius-pill);
-  background: var(--surface-glass-strong);
-  backdrop-filter: var(--blur-matte);
-  -webkit-backdrop-filter: var(--blur-matte);
-  border: 1px solid var(--surface-border);
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--ink-primary);
-  box-shadow: var(--surface-shadow);
-  cursor: pointer;
-  user-select: none;
-  transition: transform var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.timeline-add-btn:hover {
-  transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: var(--surface-shadow-elevated);
-}
-
-.timeline-add-btn:active {
-  transform: scale(0.97);
-}
-
 .timeline-header-bar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.timeline-header-actions {
-  display: inline-flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
 }
 
-.trip-stats-pill {
+.timeline-pill-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 36px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  height: 34px;
-  padding-block: 0;
-  padding-inline: 13px 10px;
-  box-sizing: border-box;
+  padding-inline: 8px;
   border-radius: var(--radius-pill);
   background: var(--surface-glass);
   backdrop-filter: var(--blur-matte);
   -webkit-backdrop-filter: var(--blur-matte);
   border: 1px solid var(--surface-border);
   box-shadow: var(--surface-shadow);
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  font-weight: 650;
   color: var(--ink-primary);
   cursor: pointer;
   user-select: none;
-  transition: transform var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+  white-space: nowrap;
+  box-sizing: border-box;
+  transition: transform var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast), color var(--transition-fast);
 }
 
-.trip-stats-pill:hover {
+.timeline-pill-btn:hover {
   transform: translateY(-1px);
   background: var(--surface-glass-strong);
   box-shadow: var(--surface-shadow-elevated);
 }
 
-.trip-stats-pill:active {
+.timeline-pill-btn:active {
   transform: scale(0.97);
 }
 
-.trip-stats-pill[aria-expanded="true"],
-.trip-stats-pill.is-open {
+.timeline-pill-btn[hidden] {
+  display: none !important;
+}
+
+.past-chapters-toggle[aria-expanded="true"],
+.past-chapters-toggle.is-open {
   background: var(--surface-glass-strong);
 }
 
-.trip-stats-arrow {
+.past-chapters-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 4px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 3px rgba(20, 24, 40, 0.08);
+  font-size: 0.70rem;
+  font-weight: 700;
+  color: var(--ink-primary);
+  line-height: 1;
+}
+
+.past-chapters-arrow {
   display: inline-block;
   font-size: 0.65rem;
   line-height: 1;
@@ -1548,118 +1534,49 @@ main {
   transition: transform var(--transition-fast);
 }
 
-.trip-stats-pill[aria-expanded="true"] .trip-stats-arrow,
-.trip-stats-pill.is-open .trip-stats-arrow {
+.past-chapters-toggle[aria-expanded="true"] .past-chapters-arrow,
+.past-chapters-toggle.is-open .past-chapters-arrow {
   transform: rotate(180deg);
 }
 
-.past-chapters-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 34px;
-  padding-block: 0;
-  padding-inline: 13px 10px;
-  box-sizing: border-box;
-  border-radius: var(--radius-pill);
-  background: var(--surface-glass-subtle);
-  backdrop-filter: var(--blur-matte);
-  -webkit-backdrop-filter: var(--blur-matte);
-  border: 1px solid var(--surface-border);
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--ink-secondary);
-  transition: transform var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast), color var(--transition-fast);
-  cursor: pointer;
-  user-select: none;
-}
-
-.past-chapters-toggle:hover {
-  transform: translateY(-1px);
-  background: var(--surface-glass-strong);
-  color: var(--ink-primary);
-  box-shadow: var(--surface-shadow-elevated);
-}
-
-.past-chapters-toggle:active {
-  transform: scale(0.97);
-}
-
-.days-breakdown-drawer {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-  border-radius: var(--radius-lg);
-  background: var(--surface-glass);
-  backdrop-filter: var(--blur-matte);
-  -webkit-backdrop-filter: var(--blur-matte);
-  border: 1px solid var(--surface-border);
-  box-shadow: var(--surface-shadow);
-  animation: view-fade-in 200ms ease;
-}
-
-.days-breakdown-drawer[hidden] {
-  display: none !important;
-}
-
-.days-breakdown-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-block-end: 8px;
-  border-block-end: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-.days-breakdown-title {
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-muted);
-}
-
-.days-breakdown-total {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--ink-primary);
-  background: var(--surface-glass-strong);
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--surface-border);
+.past-chapters-toggle[aria-expanded="true"] .past-chapters-badge,
+.past-chapters-toggle.is-open .past-chapters-badge {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 4px rgba(20, 24, 40, 0.12);
 }
 
 .days-breakdown-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+  width: 100%;
 }
 
 .days-breakdown-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.85);
-  gap: 8px;
+  gap: 12px;
 }
 
 .days-breakdown-country {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
 }
 
 .days-breakdown-flag {
-  font-size: 1.15rem;
+  font-size: 1.3rem;
   line-height: 1;
 }
 
 .days-breakdown-name {
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   font-weight: 600;
   color: var(--ink-primary);
   overflow: hidden;
@@ -1668,10 +1585,14 @@ main {
 }
 
 .days-breakdown-count {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 700;
-  color: var(--ink-secondary);
+  color: var(--ink-primary);
   white-space: nowrap;
+  background: rgba(255, 255, 255, 0.75);
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.9);
 }
 
 .past-chapters-badge {

@@ -132,12 +132,12 @@ export class CountdownBoardApp {
     });
     this.timelineRenderer = new TimelineRenderer({
       statsPillEl: this.dom.tripStatsPill,
-      daysDrawerEl: this.dom.daysBreakdownDrawer,
       pastToggleBtn: this.dom.pastChaptersToggle,
       pastDrawerEl: this.dom.pastChaptersDrawer,
       upcomingTrackEl: this.dom.timelineUpcomingTrack,
       onEditItem: (item) => this.openEventModal(item),
-      onDeleteItem: (item) => this.deleteTimelineItem(item)
+      onDeleteItem: (item) => this.deleteTimelineItem(item),
+      onOpenDaysBreakdown: () => this.openDaysBreakdownModal()
     });
   }
 
@@ -207,11 +207,17 @@ export class CountdownBoardApp {
       secondaryTzOffset: document.getElementById('secondary-tz-offset'),
 
       tripStatsPill: document.getElementById('trip-stats-pill'),
-      daysBreakdownDrawer: document.getElementById('days-breakdown-drawer'),
       pastChaptersToggle: /** @type {HTMLButtonElement | null} */ (document.getElementById('past-chapters-toggle')),
       pastChaptersDrawer: document.getElementById('past-chapters-drawer'),
       timelineUpcomingTrack: document.getElementById('timeline-upcoming-track'),
       addTimelineItemBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('add-timeline-item-btn')),
+
+      daysModalBackdrop: document.getElementById('days-modal-backdrop'),
+      daysBreakdownModal: document.getElementById('days-breakdown-modal'),
+      daysModalCloseBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('days-modal-close-btn')),
+      daysModalDoneBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('days-modal-done-btn')),
+      daysModalTotalPill: document.getElementById('days-modal-total-pill'),
+      daysModalList: document.getElementById('days-modal-list'),
 
       fabEditBtn: document.getElementById('fab-edit-btn'),
       editSheetBackdrop: document.getElementById('edit-sheet-backdrop'),
@@ -493,6 +499,7 @@ export class CountdownBoardApp {
     if (this.dom.editBottomSheet) this.dom.editBottomSheet.hidden = true;
     if (this.dom.timelineItemSheet) this.dom.timelineItemSheet.hidden = true;
     if (this.dom.subMilestoneBanner) this.dom.subMilestoneBanner.hidden = true;
+    this.closeDaysBreakdownModal();
 
     this.switchView('countdown');
 
@@ -585,9 +592,16 @@ export class CountdownBoardApp {
       if (item) this.openTimelineItemEditor(item);
     });
 
+    // 6. Days Together Country Breakdown Modal Close
+    this.dom.daysModalCloseBtn?.addEventListener('click', () => this.closeDaysBreakdownModal());
+    this.dom.daysModalDoneBtn?.addEventListener('click', () => this.closeDaysBreakdownModal());
+    this.dom.daysModalBackdrop?.addEventListener('click', () => this.closeDaysBreakdownModal());
+
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        if (this.#activeEventModalItem) {
+        if (this.dom.daysBreakdownModal && !this.dom.daysBreakdownModal.hidden) {
+          this.closeDaysBreakdownModal();
+        } else if (this.#activeEventModalItem) {
           this.closeEventModal();
         } else if (this.dom.timelineItemSheet && !this.dom.timelineItemSheet.hidden) {
           this.closeTimelineItemEditor();
@@ -1056,6 +1070,35 @@ export class CountdownBoardApp {
       this.dom.timelineItemSheet.style.transform = '';
       this.dom.timelineItemSheet.style.transition = '';
     }
+  }
+
+  openDaysBreakdownModal() {
+    if (!this.#tripConfig) return;
+    if (this.dom.daysModalBackdrop) this.dom.daysModalBackdrop.hidden = false;
+    if (this.dom.daysBreakdownModal) this.dom.daysBreakdownModal.hidden = false;
+
+    const breakdown = this.latestBoardState?.timeline.countryDaysBreakdown || [];
+    const plannedDays = this.latestBoardState?.timeline.plannedTripDaysTogether ?? 0;
+
+    if (this.dom.daysModalTotalPill) {
+      this.dom.daysModalTotalPill.textContent = `${plannedDays} Days Total`;
+    }
+    if (this.dom.daysModalList) {
+      this.dom.daysModalList.innerHTML = breakdown.map((item) => `
+        <div class="days-breakdown-item">
+          <div class="days-breakdown-country">
+            <span class="days-breakdown-flag">${item.flag}</span>
+            <span class="days-breakdown-name">${item.countryName}</span>
+          </div>
+          <span class="days-breakdown-count numeric-lock" dir="ltr">${item.days} ${item.days === 1 ? 'Day' : 'Days'}</span>
+        </div>
+      `).join('');
+    }
+  }
+
+  closeDaysBreakdownModal() {
+    if (this.dom.daysModalBackdrop) this.dom.daysModalBackdrop.hidden = true;
+    if (this.dom.daysBreakdownModal) this.dom.daysBreakdownModal.hidden = true;
   }
 
   openEventModal(item) {

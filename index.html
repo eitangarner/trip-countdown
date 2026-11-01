@@ -188,25 +188,23 @@
         <div class="timeline-header-bar">
           <button
             type="button"
-            class="trip-stats-pill"
+            class="timeline-pill-btn trip-stats-pill"
             id="trip-stats-pill"
-            aria-expanded="false"
-            aria-label="Toggle country days breakdown"
+            aria-label="Country days breakdown"
           ></button>
-          <div class="timeline-header-actions">
-            <button
-              type="button"
-              class="past-chapters-toggle"
-              id="past-chapters-toggle"
-              aria-expanded="false"
-              hidden
-            ></button>
-            <button type="button" class="timeline-add-btn" id="add-timeline-item-btn">+ Add Event</button>
-          </div>
+          <button
+            type="button"
+            class="timeline-pill-btn past-chapters-toggle"
+            id="past-chapters-toggle"
+            aria-expanded="false"
+            hidden
+          ></button>
+          <button
+            type="button"
+            class="timeline-pill-btn timeline-add-btn"
+            id="add-timeline-item-btn"
+          >+ Add Event</button>
         </div>
-
-        <!-- Collapsible Days Breakdown Drawer -->
-        <div class="days-breakdown-drawer" id="days-breakdown-drawer" hidden></div>
 
         <!-- Collapsible Past Chapters Drawer -->
         <div class="past-chapters-drawer" id="past-chapters-drawer" hidden></div>
@@ -504,6 +502,35 @@
         <button type="button" class="btn-secondary" id="event-modal-edit-btn" style="flex: 1;">Edit Entry ✏️</button>
         <button type="button" class="btn-primary" id="event-modal-done-btn" style="flex: 1;">Done</button>
       </div>
+    </div>
+  </aside>
+
+  <!-- 9. Days Together Country Breakdown Popup Modal -->
+  <div class="event-modal-backdrop" id="days-modal-backdrop" hidden></div>
+  <aside
+    class="event-modal"
+    id="days-breakdown-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="days-modal-title"
+    hidden
+  >
+    <div class="event-modal-header">
+      <div class="event-modal-badge" aria-hidden="true">🌏</div>
+      <button type="button" class="sheet-close-btn" id="days-modal-close-btn" aria-label="Close popup">✕</button>
+    </div>
+
+    <div class="event-modal-content">
+      <div class="event-modal-meta">
+        <span class="event-modal-status-pill">Reunion Breakdown</span>
+        <span class="timeline-date-pill numeric-lock" id="days-modal-total-pill" dir="ltr"></span>
+      </div>
+      <h2 class="event-modal-title" id="days-modal-title">Days Together by Country</h2>
+      <div class="days-breakdown-list" id="days-modal-list"></div>
+    </div>
+
+    <div class="event-modal-actions">
+      <button type="button" class="btn-primary" id="days-modal-done-btn" style="flex: 1;">Done</button>
     </div>
   </aside>
 
