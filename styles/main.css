@@ -1933,7 +1933,28 @@ main {
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.88);
-  transition: transform var(--transition-fast), border-color var(--transition-fast);
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.reunion-leg-item.is-interactive {
+  cursor: pointer;
+}
+
+.reunion-leg-item.is-interactive:hover {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: color-mix(in srgb, var(--ambient-accent) 45%, white);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(20, 21, 26, 0.06);
+}
+
+.reunion-leg-item.is-interactive:active {
+  transform: scale(0.985);
+}
+
+.reunion-leg-item.is-interactive:focus-visible {
+  outline: none;
+  border-color: var(--ambient-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ambient-accent) 22%, transparent);
 }
 
 .reunion-leg-item[data-status="active"],
@@ -2348,6 +2369,128 @@ main {
   outline: none;
   border-color: var(--ambient-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ambient-accent) 18%, transparent);
+}
+
+/* Chapter Multi-Country Leg Editor */
+#timeline-milestone-fields,
+#timeline-chapter-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chapter-header-fields-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px;
+  gap: 10px;
+}
+
+.chapter-legs-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-block: 4px;
+}
+
+.chapter-legs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chapter-add-leg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-block: 5px;
+  padding-inline: 12px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ambient-accent) 14%, rgba(255, 255, 255, 0.9));
+  border: 1px solid color-mix(in srgb, var(--ambient-accent) 35%, white);
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--ink-primary);
+  cursor: pointer;
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
+}
+
+.chapter-add-leg-btn:hover {
+  background: color-mix(in srgb, var(--ambient-accent) 22%, rgba(255, 255, 255, 0.95));
+}
+
+.chapter-add-leg-btn:active {
+  transform: scale(0.96);
+}
+
+.chapter-legs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chapter-leg-editor-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-block: 12px;
+  padding-inline: 12px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--surface-border);
+  box-shadow: 0 2px 8px rgba(20, 21, 26, 0.04);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.chapter-leg-editor-card.is-focused {
+  border-color: var(--ambient-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ambient-accent) 18%, transparent);
+}
+
+.chapter-leg-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chapter-leg-number-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-block: 2px;
+  padding-inline: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass-subtle);
+  border: 1px solid var(--surface-border);
+  color: var(--ink-secondary);
+}
+
+.chapter-leg-remove-btn {
+  padding-block: 3px;
+  padding-inline: 9px;
+  border-radius: var(--radius-pill);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #dc2626;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.chapter-leg-remove-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.chapter-leg-remove-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.chapter-leg-remove-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
 }
 
 /* Sync Status Pill */

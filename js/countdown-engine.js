@@ -533,13 +533,18 @@ export function evaluateBoardState(config, liveState = null, nowMs) {
       const override = chapterOverrides[rc.id];
       if (!override) return rc;
       const updated = { ...rc, ...override };
-      if (override.countryCode && Array.isArray(updated.legs) && updated.legs.length > 0) {
+      if (Array.isArray(override.legs) && override.legs.length > 0) {
+        updated.legs = override.legs.map((leg) => ({ ...leg }));
+        updated.startDate = updated.legs[0].startDate;
+        updated.endDate = updated.legs[updated.legs.length - 1].endDate;
+      } else if (override.countryCode && Array.isArray(updated.legs) && updated.legs.length > 0) {
         updated.legs = updated.legs.map((leg, index) =>
           index === 0 ? { ...leg, countryCode: override.countryCode } : leg
         );
       }
       return updated;
     })
+    .filter((rc) => Array.isArray(rc.legs) && rc.legs.length > 0)
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
   const reunionWindows = reunions.map(resolveReunionWindows);
 
@@ -869,14 +874,16 @@ export function evaluateBoardState(config, liveState = null, nowMs) {
   for (const rw of reunionWindows) {
     for (const lw of rw.legWindows) {
       const code = lw.country.code;
-      const existing = countryDaysMap.get(code) || {
+      const customLabel = lw.leg.label?.trim();
+      const mapKey = customLabel ? `${code}:${customLabel}` : code;
+      const existing = countryDaysMap.get(mapKey) || {
         countryCode: code,
-        countryName: lw.country.name,
+        countryName: customLabel || lw.country.name,
         flag: lw.country.flag,
         days: 0
       };
       existing.days += lw.totalLegDays;
-      countryDaysMap.set(code, existing);
+      countryDaysMap.set(mapKey, existing);
     }
   }
   const countryDaysBreakdown = Array.from(countryDaysMap.values());

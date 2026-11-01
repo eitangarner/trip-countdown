@@ -59,7 +59,9 @@
  * @property {string} updatedAt - ISO timestamp
  * @property {Record<string, PersonStatusOverride>} statusOverrides
  * @property {ReunionChapter[]} [customReunions] - Optional overridden reunion list
+ * @property {Record<string, Partial<ReunionChapter> & { hidden?: boolean, countryCode?: string }>} [chapterOverrides] - Edits or deletions applied to base reunion chapters
  * @property {MilestoneEvent[]} [customMilestones] - Additional user-created milestones from mobile Edit Mode
+ * @property {Record<string, Partial<MilestoneEvent> & { hidden?: boolean }>} [milestoneOverrides] - Edits or deletions applied to base milestones
  */
 
 /**

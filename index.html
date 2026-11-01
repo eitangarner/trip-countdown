@@ -388,18 +388,18 @@
 
       <!-- Chapter / Leg Fields -->
       <div id="timeline-chapter-fields" hidden>
-        <div class="form-group">
-          <label class="form-label" for="tl-chapter-title-input">Chapter Title</label>
-          <input
-            type="text"
-            class="form-input"
-            id="tl-chapter-title-input"
-            dir="auto"
-            placeholder="e.g. Thailand Reunion"
-            maxlength="80"
-          />
-        </div>
-        <div class="status-edit-grid">
+        <div class="chapter-header-fields-grid">
+          <div class="form-group">
+            <label class="form-label" for="tl-chapter-title-input">Chapter Title</label>
+            <input
+              type="text"
+              class="form-input"
+              id="tl-chapter-title-input"
+              dir="auto"
+              placeholder="e.g. Together Across 3 Countries"
+              maxlength="80"
+            />
+          </div>
           <div class="form-group">
             <label class="form-label" for="tl-chapter-emoji-input">Emoji</label>
             <input
@@ -410,21 +410,16 @@
               maxlength="4"
             />
           </div>
-          <div class="form-group">
-            <label class="form-label" for="tl-chapter-country-select">Country</label>
-            <select class="form-select" id="tl-chapter-country-select"></select>
-          </div>
         </div>
-        <div class="status-edit-grid">
-          <div class="form-group">
-            <label class="form-label" for="tl-start-date-input">Start Date</label>
-            <input type="date" class="form-input numeric-lock" id="tl-start-date-input" dir="ltr" />
+
+        <div class="chapter-legs-section">
+          <div class="chapter-legs-header">
+            <span class="form-label">Countries &amp; Dates</span>
+            <button type="button" class="chapter-add-leg-btn" id="tl-add-leg-btn">+ Add Country</button>
           </div>
-          <div class="form-group">
-            <label class="form-label" for="tl-end-date-input">End Date</label>
-            <input type="date" class="form-input numeric-lock" id="tl-end-date-input" dir="ltr" />
-          </div>
+          <div class="chapter-legs-list" id="tl-chapter-legs-list"></div>
         </div>
+
         <div class="form-group">
           <label class="form-label" for="tl-chapter-desc-input">Description / Notes (Optional)</label>
           <input

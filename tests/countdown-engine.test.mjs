@@ -371,3 +371,98 @@ test('LiveState statusOverrides: ignored during reunion if older than leg start,
   assert.equal(stateWithFreshOverride.dualStatus.primary.cityNote, 'Island Bay');
   assert.equal(stateWithFreshOverride.dualStatus.primary.isAutoSyncedToReunion, false);
 });
+
+test('LiveState chapterOverrides: supports editing country leg names/dates, adding countries, and removing countries', () => {
+  // 1. Edit leg label/dates and add a 4th country (Taiwan) to reunion-2-trio
+  const fourCountriesLiveState = {
+    schemaVersion: 1,
+    updatedAt: '2026-02-01T10:00:00Z',
+    statusOverrides: {},
+    chapterOverrides: {
+      'reunion-2-trio': {
+        title: 'Together Across 4 Countries',
+        emoji: '🌸',
+        legs: [
+          {
+            id: 'leg-stop-1',
+            countryCode: 'SG',
+            label: 'Singapore Bay',
+            startDate: '2026-03-09',
+            endDate: '2026-03-13'
+          },
+          {
+            id: 'leg-stop-2',
+            countryCode: 'KR',
+            label: 'Seoul & Busan',
+            startDate: '2026-03-13',
+            endDate: '2026-03-20'
+          },
+          {
+            id: 'leg-stop-3',
+            countryCode: 'JP',
+            startDate: '2026-03-20',
+            endDate: '2026-04-15'
+          },
+          {
+            id: 'leg-stop-4',
+            countryCode: 'TW',
+            label: 'Taipei Finale',
+            startDate: '2026-04-15',
+            endDate: '2026-04-22'
+          }
+        ]
+      }
+    }
+  };
+
+  const twMs = Date.parse('2026-04-18T12:00:00+08:00');
+  const fourCountryState = evaluateBoardState(SYNTHETIC_TRIP_CONFIG, fourCountriesLiveState, twMs);
+  assert.equal(fourCountryState.phase, 'TOGETHER');
+  assert.equal(fourCountryState.activeReunion?.reunion.title, 'Together Across 4 Countries');
+  assert.equal(fourCountryState.activeReunion?.reunion.startDate, '2026-03-09');
+  assert.equal(fourCountryState.activeReunion?.reunion.endDate, '2026-04-22');
+  assert.equal(fourCountryState.activeReunion?.totalLegs, 4);
+  assert.equal(fourCountryState.activeReunion?.legIndex, 3);
+  assert.equal(fourCountryState.activeReunion?.activeLeg.countryCode, 'TW');
+  assert.equal(fourCountryState.activeReunion?.activeLeg.label, 'Taipei Finale');
+  // 4 (SG) + 7 (KR) + 26 (JP) + 7 (TW) = 44 days
+  assert.equal(fourCountryState.activeReunion?.totalReunionDays, 44);
+  // 11 (Reunion 1) + 44 (Reunion 2) = 55 total planned days
+  assert.equal(fourCountryState.timeline.plannedTripDaysTogether, 55);
+
+  // 2. Remove a country (reduce to 2 countries: KR -> JP)
+  const twoCountriesLiveState = {
+    schemaVersion: 1,
+    updatedAt: '2026-02-02T10:00:00Z',
+    statusOverrides: {},
+    chapterOverrides: {
+      'reunion-2-trio': {
+        title: 'Together Across 2 Countries',
+        emoji: '🌸',
+        legs: [
+          {
+            id: 'leg-stop-2',
+            countryCode: 'KR',
+            startDate: '2026-03-13',
+            endDate: '2026-03-20'
+          },
+          {
+            id: 'leg-stop-3',
+            countryCode: 'JP',
+            startDate: '2026-03-20',
+            endDate: '2026-04-21'
+          }
+        ]
+      }
+    }
+  };
+
+  // On 2026-03-11 (which was previously inside SG), they are now still APART counting down to 2026-03-13
+  const march11Ms = Date.parse('2026-03-11T12:00:00+09:00');
+  const twoCountryState = evaluateBoardState(SYNTHETIC_TRIP_CONFIG, twoCountriesLiveState, march11Ms);
+  assert.equal(twoCountryState.phase, 'APART');
+  assert.equal(twoCountryState.primaryCountdown?.targetDate, '2026-03-13');
+  assert.equal(twoCountryState.primaryCountdown?.targetTitle, 'Together Across 2 Countries');
+  // 11 (Reunion 1) + 39 (7 KR + 32 JP) = 50 total planned days
+  assert.equal(twoCountryState.timeline.plannedTripDaysTogether, 50);
+});

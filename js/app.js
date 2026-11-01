@@ -47,6 +47,21 @@ function formatUtcOffsetLabel(offsetMinutes) {
 }
 
 /**
+ * Adds whole calendar days to a "YYYY-MM-DD" date string using UTC calendar arithmetic.
+ * @param {string} dateStr
+ * @param {number} daysToAdd
+ * @returns {string}
+ */
+function addCalendarDays(dateStr, daysToAdd) {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const d = new Date(Date.UTC(year, month - 1, day + daysToAdd));
+  const y = String(d.getUTCFullYear()).padStart(4, '0');
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+/**
  * Populates a <select> element with Pinned Trip Countries at the top and all 249 ISO countries alphabetically below.
  * @param {HTMLSelectElement | null} selectEl
  * @param {string} selectedCode
@@ -137,6 +152,7 @@ export class CountdownBoardApp {
       upcomingTrackEl: this.dom.timelineUpcomingTrack,
       onEditItem: (item) => this.openEventModal(item),
       onDeleteItem: (item) => this.deleteTimelineItem(item),
+      onEditLeg: (reunion, legIndex) => this.openTimelineItemEditor(reunion, legIndex),
       onOpenDaysBreakdown: () => this.openDaysBreakdownModal()
     });
   }
@@ -256,9 +272,8 @@ export class CountdownBoardApp {
       timelineChapterFields: document.getElementById('timeline-chapter-fields'),
       tlChapterTitleInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-chapter-title-input')),
       tlChapterEmojiInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-chapter-emoji-input')),
-      tlChapterCountrySelect: /** @type {HTMLSelectElement | null} */ (document.getElementById('tl-chapter-country-select')),
-      tlStartDateInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-start-date-input')),
-      tlEndDateInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-end-date-input')),
+      tlChapterLegsList: document.getElementById('tl-chapter-legs-list'),
+      tlAddLegBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('tl-add-leg-btn')),
       tlChapterDescInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-chapter-desc-input')),
       tlSaveBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('tl-save-btn')),
       tlDeleteBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('tl-delete-btn')),
@@ -381,7 +396,6 @@ export class CountdownBoardApp {
 
     populateCountrySelect(this.dom.editCurrentCountry, homeCode, pinnedCodes);
     populateCountrySelect(this.dom.tlCountrySelect, pinnedCodes[2] || homeCode, pinnedCodes);
-    populateCountrySelect(this.dom.tlChapterCountrySelect, pinnedCodes[0] || homeCode, pinnedCodes);
 
     if (this.dom.boardContainer) this.dom.boardContainer.hidden = false;
     if (this.dom.bottomNav) this.dom.bottomNav.hidden = false;
@@ -490,7 +504,7 @@ export class CountdownBoardApp {
 
     if (this.dom.editCurrentCountry) this.dom.editCurrentCountry.innerHTML = '';
     if (this.dom.tlCountrySelect) this.dom.tlCountrySelect.innerHTML = '';
-    if (this.dom.tlChapterCountrySelect) this.dom.tlChapterCountrySelect.innerHTML = '';
+    if (this.dom.tlChapterLegsList) this.dom.tlChapterLegsList.innerHTML = '';
     if (this.dom.tlPersonSelect) this.dom.tlPersonSelect.innerHTML = '';
 
     if (this.dom.boardContainer) this.dom.boardContainer.hidden = true;
@@ -703,6 +717,9 @@ export class CountdownBoardApp {
     this.dom.timelineTypeChapterBtn?.addEventListener('click', () => {
       this.setTimelineEditorMode('chapter');
     });
+    this.dom.tlAddLegBtn?.addEventListener('click', () => {
+      this.appendChapterLegRow();
+    });
 
     // 9. Timeline Item Form Submit (Milestone or Chapter)
     this.dom.timelineItemForm?.addEventListener('submit', async (event) => {
@@ -712,14 +729,25 @@ export class CountdownBoardApp {
       const id = (this.dom.tlItemIdInput?.value || '').trim();
 
       if (this.timelineEditorMode === 'chapter') {
-        const title = (this.dom.tlChapterTitleInput?.value || '').trim();
+        const rawTitle = (this.dom.tlChapterTitleInput?.value || '').trim();
         const emoji = (this.dom.tlChapterEmojiInput?.value || '').trim() || '✈️';
-        const countryCode = this.dom.tlChapterCountrySelect?.value || this.#tripConfig.homeCountryCode || 'US';
-        const startDate = this.dom.tlStartDateInput?.value || '';
-        const endDate = this.dom.tlEndDateInput?.value || '';
         const description = (this.dom.tlChapterDescInput?.value || '').trim();
+        const collectedLegs = this.collectChapterLegsFromDom()
+          .filter((leg) => leg.startDate && leg.endDate)
+          .map((leg) => ({
+            ...leg,
+            endDate: leg.endDate < leg.startDate ? leg.startDate : leg.endDate
+          }));
 
-        if (!title || !startDate || !endDate) return;
+        if (collectedLegs.length === 0) return;
+
+        const startDate = collectedLegs[0].startDate;
+        const endDate = collectedLegs[collectedLegs.length - 1].endDate;
+        const firstCountry = getCountryInfo(collectedLegs[0].countryCode);
+        const defaultTitle = collectedLegs.length > 1
+          ? `Together Across ${collectedLegs.length} Countries`
+          : `${collectedLegs[0].label || firstCountry.name} Reunion`;
+        const title = rawTitle || defaultTitle;
 
         if (!id) {
           const newId = `custom-ch-${Date.now()}`;
@@ -730,15 +758,10 @@ export class CountdownBoardApp {
             startDate,
             endDate,
             description,
-            legs: [
-              {
-                id: `${newId}-leg-1`,
-                name: title,
-                countryCode,
-                startDate,
-                endDate
-              }
-            ]
+            legs: collectedLegs.map((leg, idx) => ({
+              ...leg,
+              id: leg.id || `${newId}-leg-${idx + 1}`
+            }))
           };
           this.liveState = {
             ...this.liveState,
@@ -756,15 +779,7 @@ export class CountdownBoardApp {
               startDate,
               endDate,
               description,
-              legs: [
-                {
-                  id: existing.legs?.[0]?.id || `${id}-leg-1`,
-                  name: title,
-                  countryCode,
-                  startDate,
-                  endDate
-                }
-              ]
+              legs: collectedLegs
             };
             this.liveState = { ...this.liveState, customReunions: updated };
           } else {
@@ -777,7 +792,7 @@ export class CountdownBoardApp {
                   emoji,
                   startDate,
                   endDate,
-                  countryCode,
+                  legs: collectedLegs,
                   description,
                   hidden: false
                 }
@@ -993,21 +1008,266 @@ export class CountdownBoardApp {
     const isMilestone = mode === 'milestone';
     this.dom.timelineTypeMilestoneBtn?.classList.toggle('is-active', isMilestone);
     this.dom.timelineTypeChapterBtn?.classList.toggle('is-active', !isMilestone);
+    if (this.dom.tlTitleInput) this.dom.tlTitleInput.required = isMilestone;
+    if (this.dom.tlDateInput) this.dom.tlDateInput.required = isMilestone;
     if (this.dom.timelineMilestoneFields) {
-      this.dom.timelineMilestoneFields.style.display = isMilestone ? 'block' : 'none';
+      this.dom.timelineMilestoneFields.hidden = !isMilestone;
+      this.dom.timelineMilestoneFields.style.display = isMilestone ? 'flex' : 'none';
     }
     if (this.dom.timelineChapterFields) {
-      this.dom.timelineChapterFields.style.display = isMilestone ? 'none' : 'block';
+      this.dom.timelineChapterFields.hidden = isMilestone;
+      this.dom.timelineChapterFields.style.display = isMilestone ? 'none' : 'flex';
     }
+  }
+
+  /**
+   * Returns pinned country codes from decrypted TripConfig or default fallback.
+   * @returns {string[]}
+   */
+  getPinnedCountryCodes() {
+    return Array.isArray(this.#tripConfig?.pinnedCountryCodes) &&
+      this.#tripConfig.pinnedCountryCodes.length > 0
+      ? this.#tripConfig.pinnedCountryCodes
+      : PINNED_COUNTRY_CODES;
+  }
+
+  /**
+   * Automatically updates the chapter title if it follows the "Together Across N Countries" pattern.
+   * @param {number} legCount
+   */
+  syncAutoChapterTitleWithLegCount(legCount) {
+    if (!this.dom.tlChapterTitleInput) return;
+    const currentTitle = this.dom.tlChapterTitleInput.value.trim();
+    if (/^Together Across \d+ Countr(?:y|ies)$/i.test(currentTitle)) {
+      this.dom.tlChapterTitleInput.value = legCount === 1
+        ? 'Together Across 1 Country'
+        : `Together Across ${legCount} Countries`;
+    }
+  }
+
+  /**
+   * Reads the ordered list of ReunionLeg items from the Chapter Editor DOM.
+   * @returns {import('./config.js').ReunionLeg[]}
+   */
+  collectChapterLegsFromDom() {
+    if (!this.dom.tlChapterLegsList) return [];
+    const homeCode = this.#tripConfig?.homeCountryCode || 'US';
+    const cards = Array.from(this.dom.tlChapterLegsList.querySelectorAll('.chapter-leg-editor-card'));
+    return cards.map((card, index) => {
+      const el = /** @type {HTMLElement} */ (card);
+      const legId = el.dataset.legId || `leg-${Date.now()}-${index + 1}`;
+      const selectEl = /** @type {HTMLSelectElement | null} */ (el.querySelector('.leg-country-select'));
+      const labelInput = /** @type {HTMLInputElement | null} */ (el.querySelector('.leg-label-input'));
+      const startInput = /** @type {HTMLInputElement | null} */ (el.querySelector('.leg-start-input'));
+      const endInput = /** @type {HTMLInputElement | null} */ (el.querySelector('.leg-end-input'));
+      const notesInput = /** @type {HTMLInputElement | null} */ (el.querySelector('.leg-notes-input'));
+
+      const countryCode = selectEl?.value || homeCode;
+      const label = (labelInput?.value || '').trim();
+      const startDate = startInput?.value || '';
+      const endDate = endInput?.value || startDate;
+      const notes = (notesInput?.value || '').trim();
+
+      /** @type {import('./config.js').ReunionLeg} */
+      const leg = {
+        id: legId,
+        countryCode,
+        startDate,
+        endDate
+      };
+      if (label) leg.label = label;
+      if (notes) leg.notes = notes;
+      return leg;
+    });
+  }
+
+  /**
+   * Renders the dynamic list of editable country leg cards inside `#tl-chapter-legs-list`.
+   * @param {import('./config.js').ReunionLeg[]} legs
+   * @param {number | null} [focusLegIndex=null]
+   */
+  renderChapterLegRows(legs, focusLegIndex = null) {
+    if (!this.dom.tlChapterLegsList || !this.#tripConfig) return;
+    this.dom.tlChapterLegsList.innerHTML = '';
+
+    const pinnedCodes = this.getPinnedCountryCodes();
+    const homeCode = this.#tripConfig.homeCountryCode || 'US';
+    const safeLegs = Array.isArray(legs) && legs.length > 0
+      ? legs
+      : [
+          {
+            id: `leg-${Date.now()}-1`,
+            countryCode: pinnedCodes[0] || homeCode,
+            startDate: new Date().toISOString().slice(0, 10),
+            endDate: addCalendarDays(new Date().toISOString().slice(0, 10), 7)
+          }
+        ];
+
+    safeLegs.forEach((leg, idx) => {
+      const card = document.createElement('div');
+      card.className = `chapter-leg-editor-card${focusLegIndex === idx ? ' is-focused' : ''}`;
+      card.dataset.legId = leg.id || `leg-${Date.now()}-${idx + 1}`;
+      card.dataset.legIndex = String(idx);
+
+      const header = document.createElement('div');
+      header.className = 'chapter-leg-editor-header';
+
+      const badge = document.createElement('span');
+      badge.className = 'chapter-leg-number-badge';
+      badge.textContent = `Country #${idx + 1}`;
+      header.appendChild(badge);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'chapter-leg-remove-btn';
+      removeBtn.textContent = 'Remove ✕';
+      removeBtn.disabled = safeLegs.length <= 1;
+      removeBtn.title = safeLegs.length <= 1
+        ? 'A chapter requires at least one country'
+        : `Remove Country #${idx + 1}`;
+      removeBtn.setAttribute('aria-label', `Remove Country #${idx + 1}`);
+      removeBtn.addEventListener('click', () => {
+        const currentLegs = this.collectChapterLegsFromDom();
+        if (currentLegs.length <= 1) return;
+        currentLegs.splice(idx, 1);
+        this.syncAutoChapterTitleWithLegCount(currentLegs.length);
+        this.renderChapterLegRows(currentLegs);
+      });
+      header.appendChild(removeBtn);
+      card.appendChild(header);
+
+      const topGrid = document.createElement('div');
+      topGrid.className = 'status-edit-grid';
+
+      const countryGroup = document.createElement('div');
+      countryGroup.className = 'form-group';
+      const countryLabel = document.createElement('label');
+      countryLabel.className = 'form-label';
+      countryLabel.textContent = 'Country (Flag & Timezone)';
+      const countrySelect = document.createElement('select');
+      countrySelect.className = 'form-select leg-country-select';
+      const selectedCode = leg.countryCode || pinnedCodes[0] || homeCode;
+      populateCountrySelect(countrySelect, selectedCode, pinnedCodes);
+      countryGroup.append(countryLabel, countrySelect);
+
+      const nameGroup = document.createElement('div');
+      nameGroup.className = 'form-group';
+      const nameLabel = document.createElement('label');
+      nameLabel.className = 'form-label';
+      nameLabel.textContent = 'Display Name (Optional)';
+      const nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.className = 'form-input leg-label-input';
+      nameInput.setAttribute('dir', 'auto');
+      nameInput.maxLength = 60;
+      nameInput.placeholder = getCountryInfo(selectedCode).name;
+      nameInput.value = leg.label || '';
+
+      countrySelect.addEventListener('change', () => {
+        nameInput.placeholder = getCountryInfo(countrySelect.value).name;
+      });
+
+      nameGroup.append(nameLabel, nameInput);
+      topGrid.append(countryGroup, nameGroup);
+      card.appendChild(topGrid);
+
+      const datesGrid = document.createElement('div');
+      datesGrid.className = 'status-edit-grid';
+
+      const startGroup = document.createElement('div');
+      startGroup.className = 'form-group';
+      const startLabel = document.createElement('label');
+      startLabel.className = 'form-label';
+      startLabel.textContent = 'Start Date';
+      const startInput = document.createElement('input');
+      startInput.type = 'date';
+      startInput.className = 'form-input numeric-lock leg-start-input';
+      startInput.setAttribute('dir', 'ltr');
+      startInput.value = leg.startDate || '';
+      startGroup.append(startLabel, startInput);
+
+      const endGroup = document.createElement('div');
+      endGroup.className = 'form-group';
+      const endLabel = document.createElement('label');
+      endLabel.className = 'form-label';
+      endLabel.textContent = 'End Date';
+      const endInput = document.createElement('input');
+      endInput.type = 'date';
+      endInput.className = 'form-input numeric-lock leg-end-input';
+      endInput.setAttribute('dir', 'ltr');
+      endInput.value = leg.endDate || '';
+      endGroup.append(endLabel, endInput);
+
+      datesGrid.append(startGroup, endGroup);
+      card.appendChild(datesGrid);
+
+      const notesInput = document.createElement('input');
+      notesInput.type = 'hidden';
+      notesInput.className = 'leg-notes-input';
+      notesInput.value = leg.notes || '';
+      card.appendChild(notesInput);
+
+      this.dom.tlChapterLegsList?.appendChild(card);
+    });
+
+    if (focusLegIndex !== null && focusLegIndex >= 0) {
+      const targetCard = this.dom.tlChapterLegsList.querySelector(
+        `.chapter-leg-editor-card[data-leg-index="${focusLegIndex}"]`
+      );
+      if (targetCard instanceof HTMLElement) {
+        requestAnimationFrame(() => {
+          targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          const labelInput = targetCard.querySelector('.leg-label-input');
+          if (labelInput instanceof HTMLInputElement) {
+            labelInput.focus({ preventScroll: true });
+          }
+        });
+      }
+    }
+  }
+
+  /**
+   * Appends a new country leg to the Chapter Editor, defaulting its startDate to the previous leg's endDate.
+   */
+  appendChapterLegRow() {
+    if (!this.#tripConfig) return;
+    const currentLegs = this.collectChapterLegsFromDom();
+    const pinnedCodes = this.getPinnedCountryCodes();
+    const homeCode = this.#tripConfig.homeCountryCode || 'US';
+
+    const lastLeg = currentLegs[currentLegs.length - 1] ?? null;
+    const nextStartDate = lastLeg?.endDate || new Date().toISOString().slice(0, 10);
+    const nextEndDate = addCalendarDays(nextStartDate, 7);
+
+    const usedCodes = new Set(currentLegs.map((l) => l.countryCode));
+    const suggestedCode =
+      pinnedCodes.find((c) => !usedCodes.has(c) && c !== homeCode) ||
+      pinnedCodes[0] ||
+      homeCode;
+
+    currentLegs.push({
+      id: `leg-${Date.now()}-${currentLegs.length + 1}`,
+      countryCode: suggestedCode,
+      startDate: nextStartDate,
+      endDate: nextEndDate
+    });
+
+    this.syncAutoChapterTitleWithLegCount(currentLegs.length);
+    this.renderChapterLegRows(currentLegs, currentLegs.length - 1);
   }
 
   /**
    * Opens the timeline editor bottom sheet, populating existing data if provided.
    * @param {import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter | null} [item]
+   * @param {number | null} [focusLegIndex=null]
    */
-  openTimelineItemEditor(item = null) {
+  openTimelineItemEditor(item = null, focusLegIndex = null) {
     if (!this.#tripConfig) return;
     if (this.dom.timelineItemSheet) this.dom.timelineItemSheet.hidden = false;
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const pinnedCodes = this.getPinnedCountryCodes();
+    const homeCode = this.#tripConfig.homeCountryCode || 'US';
 
     if (item === null) {
       if (this.dom.timelineSheetTitle) this.dom.timelineSheetTitle.textContent = 'Add Timeline Entry';
@@ -1015,35 +1275,43 @@ export class CountdownBoardApp {
       if (this.dom.tlItemIdInput) this.dom.tlItemIdInput.value = '';
 
       if (this.dom.tlTitleInput) this.dom.tlTitleInput.value = '';
-      if (this.dom.tlDateInput) this.dom.tlDateInput.value = new Date().toISOString().slice(0, 10);
+      if (this.dom.tlDateInput) this.dom.tlDateInput.value = todayStr;
       if (this.dom.tlPersonSelect) this.dom.tlPersonSelect.value = 'both';
-      if (this.dom.tlCountrySelect) this.dom.tlCountrySelect.value = this.#tripConfig.homeCountryCode || 'US';
+      if (this.dom.tlCountrySelect) this.dom.tlCountrySelect.value = homeCode;
       if (this.dom.tlDetailsInput) this.dom.tlDetailsInput.value = '';
 
       if (this.dom.tlChapterTitleInput) this.dom.tlChapterTitleInput.value = '';
       if (this.dom.tlChapterEmojiInput) this.dom.tlChapterEmojiInput.value = '✈️';
-      if (this.dom.tlChapterCountrySelect) this.dom.tlChapterCountrySelect.value = this.#tripConfig.homeCountryCode || 'US';
-      if (this.dom.tlStartDateInput) this.dom.tlStartDateInput.value = new Date().toISOString().slice(0, 10);
-      if (this.dom.tlEndDateInput) this.dom.tlEndDateInput.value = new Date().toISOString().slice(0, 10);
       if (this.dom.tlChapterDescInput) this.dom.tlChapterDescInput.value = '';
+      this.renderChapterLegRows([
+        {
+          id: `leg-${Date.now()}-1`,
+          countryCode: pinnedCodes[0] || homeCode,
+          startDate: todayStr,
+          endDate: addCalendarDays(todayStr, 7)
+        }
+      ]);
 
-      if (this.dom.tlDeleteBtn) this.dom.tlDeleteBtn.style.display = 'none';
+      if (this.dom.tlDeleteBtn) {
+        this.dom.tlDeleteBtn.hidden = true;
+        this.dom.tlDeleteBtn.style.display = 'none';
+      }
       this.setTimelineEditorMode('milestone');
     } else if (isReunionChapter(item)) {
-      if (this.dom.timelineSheetTitle) this.dom.timelineSheetTitle.textContent = 'Edit Chapter';
+      if (this.dom.timelineSheetTitle) this.dom.timelineSheetTitle.textContent = 'Edit Chapter & Countries';
       if (this.dom.timelineTypeToggleGroup) this.dom.timelineTypeToggleGroup.style.display = 'none';
       if (this.dom.tlItemIdInput) this.dom.tlItemIdInput.value = item.id;
 
       if (this.dom.tlChapterTitleInput) this.dom.tlChapterTitleInput.value = item.title || '';
       if (this.dom.tlChapterEmojiInput) this.dom.tlChapterEmojiInput.value = item.emoji || '✈️';
-      const legCountry = item.legs?.[0]?.countryCode || this.#tripConfig.homeCountryCode || 'US';
-      if (this.dom.tlChapterCountrySelect) this.dom.tlChapterCountrySelect.value = legCountry;
-      if (this.dom.tlStartDateInput) this.dom.tlStartDateInput.value = item.startDate || '';
-      if (this.dom.tlEndDateInput) this.dom.tlEndDateInput.value = item.endDate || '';
       if (this.dom.tlChapterDescInput) this.dom.tlChapterDescInput.value = item.description || '';
 
-      if (this.dom.tlDeleteBtn) this.dom.tlDeleteBtn.style.display = 'block';
+      if (this.dom.tlDeleteBtn) {
+        this.dom.tlDeleteBtn.hidden = false;
+        this.dom.tlDeleteBtn.style.display = 'block';
+      }
       this.setTimelineEditorMode('chapter');
+      this.renderChapterLegRows(item.legs || [], focusLegIndex);
     } else {
       if (this.dom.timelineSheetTitle) this.dom.timelineSheetTitle.textContent = 'Edit Milestone';
       if (this.dom.timelineTypeToggleGroup) this.dom.timelineTypeToggleGroup.style.display = 'none';
@@ -1052,10 +1320,13 @@ export class CountdownBoardApp {
       if (this.dom.tlTitleInput) this.dom.tlTitleInput.value = item.title || '';
       if (this.dom.tlDateInput) this.dom.tlDateInput.value = item.date || '';
       if (this.dom.tlPersonSelect) this.dom.tlPersonSelect.value = item.person || 'both';
-      if (this.dom.tlCountrySelect) this.dom.tlCountrySelect.value = item.countryCode || this.#tripConfig.homeCountryCode || 'US';
+      if (this.dom.tlCountrySelect) this.dom.tlCountrySelect.value = item.countryCode || homeCode;
       if (this.dom.tlDetailsInput) this.dom.tlDetailsInput.value = item.details || '';
 
-      if (this.dom.tlDeleteBtn) this.dom.tlDeleteBtn.style.display = 'block';
+      if (this.dom.tlDeleteBtn) {
+        this.dom.tlDeleteBtn.hidden = false;
+        this.dom.tlDeleteBtn.style.display = 'block';
+      }
       this.setTimelineEditorMode('milestone');
     }
 
@@ -1358,22 +1629,24 @@ export class CountdownBoardApp {
 
       const ar = state.activeReunion;
       const legCountry = getCountryInfo(ar.activeLeg.countryCode);
+      const legDisplayName = ar.activeLeg.label || legCountry.name;
 
       if (this.dom.togetherLegBadge) {
         const legTag = ar.totalLegs > 1
-          ? `Leg ${ar.legIndex + 1} of ${ar.totalLegs} • ${legCountry.flag} ${legCountry.name}`
-          : `${legCountry.flag} ${legCountry.name}`;
+          ? `Leg ${ar.legIndex + 1} of ${ar.totalLegs} • ${legCountry.flag} ${legDisplayName}`
+          : `${legCountry.flag} ${legDisplayName}`;
         this.dom.togetherLegBadge.textContent = `${legTag} • Day ${ar.dayOfReunion} of ${ar.totalReunionDays}`;
       }
 
       if (this.dom.togetherHeadline) {
-        this.dom.togetherHeadline.textContent = `${ar.reunion.emoji} Together in ${legCountry.name}!`;
+        this.dom.togetherHeadline.textContent = `${ar.reunion.emoji} Together in ${legDisplayName}!`;
       }
 
       if (this.dom.togetherSubtext) {
         if (ar.nextLeg) {
           const nextCountry = getCountryInfo(ar.nextLeg.countryCode);
-          this.dom.togetherSubtext.textContent = `Next leg: ${nextCountry.flag} ${nextCountry.name} in ${ar.daysUntilNextLeg} day${ar.daysUntilNextLeg === 1 ? '' : 's'} (${formatShortDisplayDate(ar.nextLeg.startDate)})`;
+          const nextLegDisplayName = ar.nextLeg.label || nextCountry.name;
+          this.dom.togetherSubtext.textContent = `Next leg: ${nextCountry.flag} ${nextLegDisplayName} in ${ar.daysUntilNextLeg} day${ar.daysUntilNextLeg === 1 ? '' : 's'} (${formatShortDisplayDate(ar.nextLeg.startDate)})`;
         } else {
           this.dom.togetherSubtext.textContent = ar.activeLeg.notes || ar.reunion.description;
         }
@@ -1482,7 +1755,7 @@ export class CountdownBoardApp {
     }
 
     // 6. Timeline (re-render only when partition or active state changes, or when forced)
-    const timelineSig = `${state.phase}:${state.activeReunion?.activeLeg.id ?? 'none'}:${state.timeline.pastItems.length}:${state.timeline.upcomingItems.length}:${state.timeline.completedTripDaysTogether}`;
+    const timelineSig = `${state.phase}:${state.activeReunion?.activeLeg.id ?? 'none'}:${state.timeline.pastItems.length}:${state.timeline.upcomingItems.length}:${state.timeline.plannedTripDaysTogether}:${state.timeline.completedTripDaysTogether}`;
     if (forceTimelineRender || timelineSig !== this.lastTimelineSignature) {
       this.lastTimelineSignature = timelineSig;
       this.timelineRenderer.render(state);
