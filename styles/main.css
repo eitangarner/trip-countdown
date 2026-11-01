@@ -2582,14 +2582,17 @@ main {
 
 .event-modal-header {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .event-modal-title-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+  flex: 1;
+  min-width: 0;
 }
 
 .event-modal-badge {
@@ -2602,7 +2605,7 @@ main {
 .event-modal-content {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .event-modal-meta {
@@ -2632,33 +2635,30 @@ main {
 }
 
 .event-modal-title {
-  font-size: 1.35rem;
+  font-size: clamp(1.2rem, 5vw, 1.35rem);
   font-weight: 850;
   color: var(--ink-primary);
   letter-spacing: -0.02em;
   line-height: 1.25;
-}
-
-.event-modal-travel-info {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .event-modal-travel-tag {
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
-  font-size: 0.72rem;
+  font-size: 0.70rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   padding-block: 2.5px;
   padding-inline: 8px;
   border-radius: var(--radius-pill);
   background: var(--surface-glass-subtle);
   border: 1px solid var(--surface-border);
   color: var(--ink-secondary);
+  white-space: nowrap;
 }
 
 .event-modal-travel-tag[hidden] {
@@ -2669,9 +2669,11 @@ main {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--ink-secondary);
+  line-height: 1.4;
+  flex-wrap: wrap;
 }
 
 #event-modal-date-pill {
@@ -2691,7 +2693,6 @@ main {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-block-start: 4px;
 }
 
 /* ==========================================================================
