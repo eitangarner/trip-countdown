@@ -10,14 +10,21 @@ import {
   unlockAndCacheVault
 } from './crypto-vault.js';
 import {
+  decomposeRemainingMs,
   evaluateBoardState,
   formatDisplayDate,
   formatShortDisplayDate,
+  getEndOfDayInTimeZoneMs,
+  getStartOfDayInTimeZoneMs,
   getZonedDateParts,
   resolvePartnerConfigMeta
 } from './countdown-engine.js';
 import { PhotoStackController } from './photo-stack.js';
-import { isReunionChapter, TimelineRenderer } from './timeline-renderer.js';
+import {
+  isReunionChapter,
+  resolveMilestonePersonMeta,
+  TimelineRenderer
+} from './timeline-renderer.js';
 import {
   clearLocalLiveState,
   loadLiveState,
@@ -90,6 +97,9 @@ export class CountdownBoardApp {
   /** @type { ReturnType<typeof setInterval> | null } */
   #tickIntervalId = null;
 
+  /** @type {import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter | null} */
+  #activeEventModalItem = null;
+
   constructor() {
     /** @type {{ owner: string, repo: string, branch: string, path: string } | null} */
     this.githubRepo = null;
@@ -125,7 +135,7 @@ export class CountdownBoardApp {
       pastToggleBtn: this.dom.pastChaptersToggle,
       pastDrawerEl: this.dom.pastChaptersDrawer,
       upcomingTrackEl: this.dom.timelineUpcomingTrack,
-      onEditItem: (item) => this.openTimelineItemEditor(item),
+      onEditItem: (item) => this.openEventModal(item),
       onDeleteItem: (item) => this.deleteTimelineItem(item)
     });
   }
@@ -244,6 +254,22 @@ export class CountdownBoardApp {
       tlChapterDescInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-chapter-desc-input')),
       tlSaveBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('tl-save-btn')),
       tlDeleteBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('tl-delete-btn')),
+
+      eventModalBackdrop: document.getElementById('event-modal-backdrop'),
+      eventModal: document.getElementById('event-modal'),
+      eventModalBadge: document.getElementById('event-modal-badge'),
+      eventModalCloseBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('event-modal-close-btn')),
+      eventModalStatusPill: document.getElementById('event-modal-status-pill'),
+      eventModalDatePill: document.getElementById('event-modal-date-pill'),
+      eventModalTitle: document.getElementById('event-modal-title'),
+      eventModalLocation: document.getElementById('event-modal-location'),
+      eventCdDays: document.getElementById('event-cd-days'),
+      eventCdHours: document.getElementById('event-cd-hours'),
+      eventCdMinutes: document.getElementById('event-cd-minutes'),
+      eventCdSeconds: document.getElementById('event-cd-seconds'),
+      eventModalSubtext: document.getElementById('event-modal-subtext'),
+      eventModalEditBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('event-modal-edit-btn')),
+      eventModalDoneBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('event-modal-done-btn')),
 
       lockDeviceBtn: document.getElementById('lock-device-btn')
     };
@@ -407,6 +433,7 @@ export class CountdownBoardApp {
 
     this.closeEditSheet();
     this.closeTimelineItemEditor();
+    this.closeEventModal();
     this.photoStack.clear();
     this.timelineRenderer.clear();
 
@@ -438,7 +465,11 @@ export class CountdownBoardApp {
       this.dom.secondaryCountry,
       this.dom.secondaryCityNote,
       this.dom.secondaryClock,
-      this.dom.secondaryTzOffset
+      this.dom.secondaryTzOffset,
+      this.dom.eventModalTitle,
+      this.dom.eventModalLocation,
+      this.dom.eventModalSubtext,
+      this.dom.eventModalDatePill
     ];
     for (const el of textElementsToClear) {
       if (el) el.textContent = '';
@@ -541,6 +572,28 @@ export class CountdownBoardApp {
     this.dom.addTimelineItemBtn?.addEventListener('click', () => this.openTimelineItemEditor(null));
     this.dom.timelineSheetCloseBtn?.addEventListener('click', () => this.closeTimelineItemEditor());
     this.dom.timelineSheetBackdrop?.addEventListener('click', () => this.closeTimelineItemEditor());
+
+    // 5. Event Countdown Popup Modal Open / Close
+    this.dom.eventModalCloseBtn?.addEventListener('click', () => this.closeEventModal());
+    this.dom.eventModalDoneBtn?.addEventListener('click', () => this.closeEventModal());
+    this.dom.eventModalBackdrop?.addEventListener('click', () => this.closeEventModal());
+    this.dom.eventModalEditBtn?.addEventListener('click', () => {
+      const item = this.#activeEventModalItem;
+      this.closeEventModal();
+      if (item) this.openTimelineItemEditor(item);
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (this.#activeEventModalItem) {
+          this.closeEventModal();
+        } else if (this.dom.timelineItemSheet && !this.dom.timelineItemSheet.hidden) {
+          this.closeTimelineItemEditor();
+        } else if (this.dom.editBottomSheet && !this.dom.editBottomSheet.hidden) {
+          this.closeEditSheet();
+        }
+      }
+    });
 
     // Touch drag-down gestures for both sheets
     this.bindSheetDragGestures(
@@ -982,6 +1035,125 @@ export class CountdownBoardApp {
     }
   }
 
+  openEventModal(item) {
+    if (!item || !this.#tripConfig) return;
+    this.#activeEventModalItem = item;
+    if (this.dom.eventModalBackdrop) this.dom.eventModalBackdrop.hidden = false;
+    if (this.dom.eventModal) this.dom.eventModal.hidden = false;
+    this.updateEventModalCountdown();
+  }
+
+  closeEventModal() {
+    this.#activeEventModalItem = null;
+    if (this.dom.eventModalBackdrop) this.dom.eventModalBackdrop.hidden = true;
+    if (this.dom.eventModal) this.dom.eventModal.hidden = true;
+  }
+
+  updateEventModalCountdown() {
+    if (!this.#activeEventModalItem || !this.#tripConfig) return;
+
+    const item = this.#activeEventModalItem;
+    const nowMs = this.latestBoardState?.nowMs ?? Date.now();
+    const isChapter = isReunionChapter(item);
+
+    let emoji = '';
+    let title = '';
+    let datePillText = '';
+    let locationText = '';
+    let targetStartMs = 0;
+    let targetEndMs = 0;
+    let subtext = '';
+
+    if (isChapter) {
+      emoji = item.emoji || '🌺';
+      title = item.title;
+      datePillText = `${formatDisplayDate(item.startDate)} – ${formatDisplayDate(item.endDate)}`;
+
+      const firstLeg = item.legs?.[0];
+      const startCountry = firstLeg ? getCountryInfo(firstLeg.countryCode) : getCountryInfo(this.#tripConfig.homeCountryCode || 'US');
+      const lastLeg = item.legs?.[item.legs.length - 1];
+      const endCountry = lastLeg ? getCountryInfo(lastLeg.countryCode) : startCountry;
+
+      targetStartMs = getStartOfDayInTimeZoneMs(item.startDate, startCountry.timeZone);
+      targetEndMs = getEndOfDayInTimeZoneMs(item.endDate, endCountry.timeZone);
+
+      const countryNames = item.legs?.map((l) => {
+        const c = getCountryInfo(l.countryCode);
+        return `${c.flag} ${l.label || c.name}`;
+      }).join(' • ') || `${startCountry.flag} ${startCountry.name}`;
+
+      locationText = `Reunion Chapter • ${countryNames}`;
+      subtext = item.description || '';
+    } else {
+      emoji = item.emoji || '✨';
+      title = item.title;
+      datePillText = formatDisplayDate(item.date);
+
+      const countryInfo = item.countryCode ? getCountryInfo(item.countryCode) : getCountryInfo(this.#tripConfig.homeCountryCode || 'US');
+      targetStartMs = getStartOfDayInTimeZoneMs(item.date, countryInfo.timeZone);
+      targetEndMs = getEndOfDayInTimeZoneMs(item.date, countryInfo.timeZone);
+
+      const meta = this.latestBoardState
+        ? resolveMilestonePersonMeta(item.person || 'both', this.latestBoardState)
+        : { icon: '💕', label: 'Together' };
+
+      locationText = `${countryInfo.flag} ${countryInfo.name} • ${meta.icon} ${meta.label}`;
+      subtext = item.details || '';
+    }
+
+    if (this.dom.eventModalBadge) this.dom.eventModalBadge.textContent = emoji;
+    if (this.dom.eventModalTitle) this.dom.eventModalTitle.textContent = title;
+    if (this.dom.eventModalDatePill) this.dom.eventModalDatePill.textContent = datePillText;
+    if (this.dom.eventModalLocation) this.dom.eventModalLocation.textContent = locationText;
+
+    if (nowMs < targetStartMs) {
+      const remaining = decomposeRemainingMs(targetStartMs - nowMs);
+      if (this.dom.eventCdDays) this.dom.eventCdDays.textContent = String(remaining.days).padStart(2, '0');
+      if (this.dom.eventCdHours) this.dom.eventCdHours.textContent = String(remaining.hours).padStart(2, '0');
+      if (this.dom.eventCdMinutes) this.dom.eventCdMinutes.textContent = String(remaining.minutes).padStart(2, '0');
+      if (this.dom.eventCdSeconds) this.dom.eventCdSeconds.textContent = String(remaining.seconds).padStart(2, '0');
+
+      if (this.dom.eventModalStatusPill) {
+        this.dom.eventModalStatusPill.className = 'event-modal-status-pill';
+        this.dom.eventModalStatusPill.textContent = remaining.days === 0
+          ? 'Starts Today'
+          : remaining.days === 1
+            ? 'Starts Tomorrow'
+            : `${remaining.days} Days Away`;
+      }
+      if (this.dom.eventModalSubtext) {
+        this.dom.eventModalSubtext.textContent = subtext || `Counting down until this ${isChapter ? 'chapter begins' : 'event'}.`;
+      }
+    } else if (nowMs <= targetEndMs) {
+      const remaining = decomposeRemainingMs(targetEndMs - nowMs);
+      if (this.dom.eventCdDays) this.dom.eventCdDays.textContent = String(remaining.days).padStart(2, '0');
+      if (this.dom.eventCdHours) this.dom.eventCdHours.textContent = String(remaining.hours).padStart(2, '0');
+      if (this.dom.eventCdMinutes) this.dom.eventCdMinutes.textContent = String(remaining.minutes).padStart(2, '0');
+      if (this.dom.eventCdSeconds) this.dom.eventCdSeconds.textContent = String(remaining.seconds).padStart(2, '0');
+
+      if (this.dom.eventModalStatusPill) {
+        this.dom.eventModalStatusPill.className = 'event-modal-status-pill is-active';
+        this.dom.eventModalStatusPill.textContent = isChapter ? 'Active Chapter 💕' : 'Happening Today 🎉';
+      }
+      if (this.dom.eventModalSubtext) {
+        this.dom.eventModalSubtext.textContent = subtext || (isChapter ? 'Reunion is in progress!' : 'Today is the day! Enjoy every moment.');
+      }
+    } else {
+      if (this.dom.eventCdDays) this.dom.eventCdDays.textContent = '00';
+      if (this.dom.eventCdHours) this.dom.eventCdHours.textContent = '00';
+      if (this.dom.eventCdMinutes) this.dom.eventCdMinutes.textContent = '00';
+      if (this.dom.eventCdSeconds) this.dom.eventCdSeconds.textContent = '00';
+
+      if (this.dom.eventModalStatusPill) {
+        this.dom.eventModalStatusPill.className = 'event-modal-status-pill';
+        this.dom.eventModalStatusPill.textContent = 'Completed Event';
+      }
+      if (this.dom.eventModalSubtext) {
+        this.dom.eventModalSubtext.textContent = subtext || 'This event has already taken place.';
+      }
+    }
+  }
+
   /**
    * Deletes or hides a timeline milestone or reunion chapter and syncs live state.
    * @param {any} item
@@ -1249,6 +1421,11 @@ export class CountdownBoardApp {
     if (forceTimelineRender || timelineSig !== this.lastTimelineSignature) {
       this.lastTimelineSignature = timelineSig;
       this.timelineRenderer.render(state);
+    }
+
+    // 7. Event Modal live countdown (ticks in real time when open)
+    if (this.#activeEventModalItem) {
+      this.updateEventModalCountdown();
     }
   }
 

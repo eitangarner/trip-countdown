@@ -532,4 +532,15 @@ test('Integration: index.html contains Timeline Header Add Button, Update Status
   assert.ok(html.includes('id="timeline-chapter-fields"'));
   assert.ok(html.includes('id="tl-save-btn"'));
   assert.ok(html.includes('id="tl-delete-btn"'));
+
+  // Dedicated Event / Milestone Countdown Popup Modal
+  assert.ok(html.includes('id="event-modal"'));
+  assert.ok(html.includes('id="event-modal-backdrop"'));
+  assert.ok(html.includes('id="event-modal-countdown-grid"'));
+  assert.ok(html.includes('id="event-cd-days"'));
+  assert.ok(html.includes('id="event-cd-hours"'));
+  assert.ok(html.includes('id="event-cd-minutes"'));
+  assert.ok(html.includes('id="event-cd-seconds"'));
+  assert.ok(html.includes('id="event-modal-edit-btn"'));
+  assert.ok(html.includes('id="event-modal-date-pill"'));
 });
