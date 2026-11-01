@@ -797,6 +797,23 @@ main {
   font-size: 0.66rem;
 }
 
+.date-page.date-page-no-slash::after {
+  display: none !important;
+}
+
+.date-page-range-sep {
+  margin-inline: 4px;
+  font-size: 0.70rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  opacity: 0.6;
+}
+
+.date-pages-compact .date-page-range-sep {
+  font-size: 0.66rem;
+  margin-inline: 3px;
+}
+
 .timeline-date-pill {
   display: inline-flex;
   align-items: center;
@@ -828,8 +845,6 @@ main {
   font-weight: 650;
   letter-spacing: -0.01em;
   color: var(--ink-primary);
-  pointer-events: auto;
-}
   pointer-events: auto;
 }
 
@@ -1714,22 +1729,6 @@ main {
 }
 
 .reunion-date-range {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding-block: 2.5px;
-  padding-inline: 8px;
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  box-shadow: 0 1px 3px rgba(20, 21, 26, 0.04);
-  font-size: 0.70rem;
-  font-weight: 600;
-  color: var(--ink-secondary);
-  opacity: 0.85;
-  letter-spacing: -0.01em;
   margin-block-start: 4px;
   width: fit-content;
 }
@@ -1808,25 +1807,11 @@ main {
 }
 
 .reunion-leg-notes {
-  font-size: 0.74rem;
-  color: var(--ink-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: none !important;
 }
 
 .reunion-leg-dates {
-  font-size: 0.68rem;
-  font-weight: 600;
-  color: var(--ink-secondary);
-  opacity: 0.85;
-  padding-block: 2.5px;
-  padding-inline: 8px;
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.42);
-  border: 1px solid rgba(255, 255, 255, 0.65);
   flex-shrink: 0;
-  letter-spacing: -0.01em;
 }
 
 /* ==========================================================================
@@ -2317,11 +2302,17 @@ main {
   color: var(--ink-secondary);
 }
 
+#event-modal-date-pill {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  padding: 0;
+  box-shadow: none;
+}
+
 .event-modal-subtext {
-  font-size: 0.82rem;
-  color: var(--ink-secondary);
-  line-height: 1.4;
-  text-align: center;
+  display: none !important;
 }
 
 .event-modal-actions {

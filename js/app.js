@@ -19,7 +19,7 @@ import {
   getZonedDateParts,
   resolvePartnerConfigMeta
 } from './countdown-engine.js';
-import { PhotoStackController } from './photo-stack.js';
+import { PhotoStackController, createPhotoDateElement } from './photo-stack.js';
 import {
   isReunionChapter,
   resolveMilestonePersonMeta,
@@ -1103,8 +1103,14 @@ export class CountdownBoardApp {
 
     if (this.dom.eventModalBadge) this.dom.eventModalBadge.textContent = emoji;
     if (this.dom.eventModalTitle) this.dom.eventModalTitle.textContent = title;
-    if (this.dom.eventModalDatePill) this.dom.eventModalDatePill.textContent = datePillText;
+    if (this.dom.eventModalDatePill) {
+      this.dom.eventModalDatePill.replaceChildren(createPhotoDateElement(datePillText, { isCompact: true }));
+    }
     if (this.dom.eventModalLocation) this.dom.eventModalLocation.textContent = locationText;
+    if (this.dom.eventModalSubtext) {
+      this.dom.eventModalSubtext.textContent = '';
+      this.dom.eventModalSubtext.hidden = true;
+    }
 
     if (nowMs < targetStartMs) {
       const remaining = decomposeRemainingMs(targetStartMs - nowMs);
@@ -1121,9 +1127,6 @@ export class CountdownBoardApp {
             ? 'Starts Tomorrow'
             : `${remaining.days} Days Away`;
       }
-      if (this.dom.eventModalSubtext) {
-        this.dom.eventModalSubtext.textContent = subtext || `Counting down until this ${isChapter ? 'chapter begins' : 'event'}.`;
-      }
     } else if (nowMs <= targetEndMs) {
       const remaining = decomposeRemainingMs(targetEndMs - nowMs);
       if (this.dom.eventCdDays) this.dom.eventCdDays.textContent = String(remaining.days).padStart(2, '0');
@@ -1135,9 +1138,6 @@ export class CountdownBoardApp {
         this.dom.eventModalStatusPill.className = 'event-modal-status-pill is-active';
         this.dom.eventModalStatusPill.textContent = isChapter ? 'Active Chapter 💕' : 'Happening Today 🎉';
       }
-      if (this.dom.eventModalSubtext) {
-        this.dom.eventModalSubtext.textContent = subtext || (isChapter ? 'Reunion is in progress!' : 'Today is the day! Enjoy every moment.');
-      }
     } else {
       if (this.dom.eventCdDays) this.dom.eventCdDays.textContent = '00';
       if (this.dom.eventCdHours) this.dom.eventCdHours.textContent = '00';
@@ -1147,9 +1147,6 @@ export class CountdownBoardApp {
       if (this.dom.eventModalStatusPill) {
         this.dom.eventModalStatusPill.className = 'event-modal-status-pill';
         this.dom.eventModalStatusPill.textContent = 'Completed Event';
-      }
-      if (this.dom.eventModalSubtext) {
-        this.dom.eventModalSubtext.textContent = subtext || 'This event has already taken place.';
       }
     }
   }
@@ -1335,7 +1332,7 @@ export class CountdownBoardApp {
         this.dom.countdownTargetTitle.textContent = `${cd.targetEmoji} ${cd.targetTitle}`;
       }
       if (this.dom.countdownTargetDate) {
-        this.dom.countdownTargetDate.textContent = formatDisplayDate(cd.targetDate);
+        this.dom.countdownTargetDate.replaceChildren(createPhotoDateElement(cd.targetDate, { isCompact: true }));
       }
 
       if (this.dom.cdDays) this.dom.cdDays.textContent = String(cd.days).padStart(2, '0');

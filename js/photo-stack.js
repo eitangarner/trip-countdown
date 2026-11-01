@@ -489,32 +489,92 @@ export function extractLuminousPalette(imageSource) {
   return { ...DEFAULT_LUMINOUS_PALETTE };
 }
 
+function parseDateParts(str) {
+  if (!str || typeof str !== 'string') return null;
+  const trimmed = str.trim();
+  const dmyMatch = trimmed.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+  const ymdMatch = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (dmyMatch) {
+    const rawYear = dmyMatch[3];
+    const year = rawYear.length === 2 ? `20${rawYear}` : rawYear;
+    return {
+      day: dmyMatch[1].padStart(2, '0'),
+      month: dmyMatch[2].padStart(2, '0'),
+      year
+    };
+  }
+  if (ymdMatch) {
+    return {
+      day: ymdMatch[3].padStart(2, '0'),
+      month: ymdMatch[2].padStart(2, '0'),
+      year: ymdMatch[1]
+    };
+  }
+  return null;
+}
+
 /**
  * Creates an elegant calendar-sheet date badge with separate "pages" for day, month, and year.
+ * Also supports date ranges (e.g. "31-12-2026 – 10-01-2027").
  * If dateLabel does not match a standard calendar date, returns a fallback single pill.
  * @param {string} dateLabel
  * @param {{ isCompact?: boolean }} [options]
  * @returns {HTMLElement}
  */
 export function createPhotoDateElement(dateLabel, { isCompact = false } = {}) {
-  const dmyMatch = dateLabel.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
-  const ymdMatch = dateLabel.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  const rangeSplit = typeof dateLabel === 'string' ? dateLabel.split(/\s+[–—]\s+/) : null;
+  if (rangeSplit && rangeSplit.length === 2) {
+    const startParts = parseDateParts(rangeSplit[0]);
+    const endParts = parseDateParts(rangeSplit[1]);
+    if (startParts && endParts) {
+      const pagesContainer = document.createElement('div');
+      pagesContainer.className = `${isCompact ? 'photo-date-pages date-pages-compact' : 'photo-date-pages'} numeric-lock`;
+      pagesContainer.setAttribute('dir', 'ltr');
+      pagesContainer.setAttribute('aria-label', `Date: ${startParts.day}-${startParts.month}-${startParts.year} – ${endParts.day}-${endParts.month}-${endParts.year}`);
 
-  let day = '';
-  let month = '';
-  let year = '';
+      const startUnits = [
+        { val: startParts.day, cls: 'date-page-day' },
+        { val: startParts.month, cls: 'date-page-month' },
+        { val: startParts.year, cls: 'date-page-year date-page-no-slash' }
+      ];
 
-  if (dmyMatch) {
-    day = dmyMatch[1].padStart(2, '0');
-    month = dmyMatch[2].padStart(2, '0');
-    year = dmyMatch[3];
-  } else if (ymdMatch) {
-    year = ymdMatch[1];
-    month = ymdMatch[2].padStart(2, '0');
-    day = ymdMatch[3].padStart(2, '0');
+      for (const unit of startUnits) {
+        const page = document.createElement('div');
+        page.className = `date-page ${unit.cls}`;
+        const value = document.createElement('span');
+        value.className = 'date-page-value';
+        value.textContent = unit.val;
+        page.appendChild(value);
+        pagesContainer.appendChild(page);
+      }
+
+      const sep = document.createElement('span');
+      sep.className = 'date-page-range-sep';
+      sep.textContent = '–';
+      pagesContainer.appendChild(sep);
+
+      const endUnits = [
+        { val: endParts.day, cls: 'date-page-day' },
+        { val: endParts.month, cls: 'date-page-month' },
+        { val: endParts.year, cls: 'date-page-year' }
+      ];
+
+      for (const unit of endUnits) {
+        const page = document.createElement('div');
+        page.className = `date-page ${unit.cls}`;
+        const value = document.createElement('span');
+        value.className = 'date-page-value';
+        value.textContent = unit.val;
+        page.appendChild(value);
+        pagesContainer.appendChild(page);
+      }
+
+      return pagesContainer;
+    }
   }
 
-  if (!day || !month || !year) {
+  const singleParts = parseDateParts(dateLabel);
+  if (!singleParts) {
     const singlePill = document.createElement('div');
     singlePill.className = `${isCompact ? 'timeline-date-pill' : 'photo-date-pill'} numeric-lock`;
     singlePill.setAttribute('dir', 'ltr');
@@ -522,6 +582,7 @@ export function createPhotoDateElement(dateLabel, { isCompact = false } = {}) {
     return singlePill;
   }
 
+  const { day, month, year } = singleParts;
   const pagesContainer = document.createElement('div');
   pagesContainer.className = `${isCompact ? 'photo-date-pages date-pages-compact' : 'photo-date-pages'} numeric-lock`;
   pagesContainer.setAttribute('dir', 'ltr');

@@ -204,10 +204,8 @@ function createReunionCardElement(reunion, boardState, onEditItem = null, onDele
   titleEl.setAttribute('dir', 'auto');
   titleEl.textContent = reunion.title;
 
-  const dateRangeEl = document.createElement('div');
-  dateRangeEl.className = 'reunion-date-range numeric-lock';
-  dateRangeEl.setAttribute('dir', 'ltr');
-  dateRangeEl.textContent = `${formatDisplayDate(reunion.startDate)} – ${formatDisplayDate(reunion.endDate)}`;
+  const dateRangeEl = createPhotoDateElement(`${formatDisplayDate(reunion.startDate)} – ${formatDisplayDate(reunion.endDate)}`, { isCompact: true });
+  dateRangeEl.classList.add('reunion-date-range');
 
   titleStack.appendChild(titleEl);
   titleStack.appendChild(dateRangeEl);
@@ -273,21 +271,11 @@ function createReunionCardElement(reunion, boardState, onEditItem = null, onDele
 
       infoCol.appendChild(countryNameEl);
 
-      if (leg.notes) {
-        const notesEl = document.createElement('div');
-        notesEl.className = 'reunion-leg-notes';
-        notesEl.setAttribute('dir', 'auto');
-        notesEl.textContent = leg.notes;
-        infoCol.appendChild(notesEl);
-      }
-
       legMain.appendChild(flagSpan);
       legMain.appendChild(infoCol);
 
-      const datesBadge = document.createElement('span');
-      datesBadge.className = 'reunion-leg-dates numeric-lock';
-      datesBadge.setAttribute('dir', 'ltr');
-      datesBadge.textContent = `${formatShortDisplayDate(leg.startDate)} – ${formatShortDisplayDate(leg.endDate)}`;
+      const datesBadge = createPhotoDateElement(`${formatDisplayDate(leg.startDate)} – ${formatDisplayDate(leg.endDate)}`, { isCompact: true });
+      datesBadge.classList.add('reunion-leg-dates');
 
       legItem.appendChild(legMain);
       legItem.appendChild(datesBadge);

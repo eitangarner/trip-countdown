@@ -311,6 +311,19 @@ test('Integration: createPhotoDateElement splits DD-MM-YYYY into day, month, and
     // Compact mode for timeline cards
     const compactPages = /** @type {any} */ (createPhotoDateElement('15-12-2026', { isCompact: true }));
     assert.ok(compactPages.className.includes('date-pages-compact'));
+
+    // Range support produces segmented pill with start, separator, and end units
+    const rangePages = /** @type {any} */ (createPhotoDateElement('31-12-2026 – 10-01-2027', { isCompact: true }));
+    assert.ok(rangePages.className.includes('photo-date-pages'));
+    assert.ok(rangePages.className.includes('date-pages-compact'));
+    assert.equal(rangePages.children.length, 7); // 3 start + 1 sep + 3 end
+    assert.equal(rangePages.children[0].children[0].textContent, '31');
+    assert.equal(rangePages.children[1].children[0].textContent, '12');
+    assert.equal(rangePages.children[2].children[0].textContent, '2026');
+    assert.equal(rangePages.children[3].textContent, '–');
+    assert.equal(rangePages.children[4].children[0].textContent, '10');
+    assert.equal(rangePages.children[5].children[0].textContent, '01');
+    assert.equal(rangePages.children[6].children[0].textContent, '2027');
   } finally {
     globalThis.document = prevDoc;
   }
