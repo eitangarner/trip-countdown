@@ -19,7 +19,53 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding-inline: 4px;
+}
+
+.section-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.status-header-update-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-block: 4px;
+  padding-inline: 11px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass-strong);
+  backdrop-filter: var(--blur-matte);
+  -webkit-backdrop-filter: var(--blur-matte);
+  border: 1px solid var(--surface-border);
+  box-shadow: 0 2px 8px rgba(20, 21, 26, 0.05);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--ink-primary);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: transform var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.status-header-update-btn:hover {
+  background: rgba(255, 255, 255, 0.95);
+  transform: translateY(-1px);
+  box-shadow: var(--surface-shadow-elevated);
+}
+
+.status-header-update-btn:active {
+  transform: scale(0.96);
+}
+
+.status-header-update-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ambient-accent) 25%, transparent);
 }
 
 .section-title {
@@ -54,6 +100,27 @@
   justify-content: space-between;
   gap: 8px;
   overflow: hidden;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.person-status-card.is-interactive {
+  cursor: pointer;
+  user-select: none;
+}
+
+.person-status-card.is-interactive:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--surface-shadow-elevated);
+  border-color: rgba(255, 255, 255, 0.95);
+}
+
+.person-status-card.is-interactive:active {
+  transform: scale(0.98);
+}
+
+.person-status-card.is-interactive:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ambient-accent) 25%, transparent);
 }
 
 .person-status-card::before {
@@ -120,12 +187,13 @@
 
 .person-country,
 .country-name {
-  font-size: 1.02rem;
+  font-size: clamp(0.92rem, 3.4vw, 1.02rem);
   font-weight: 700;
   color: var(--ink-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 
 .city-note {
@@ -155,10 +223,11 @@
   gap: 6px;
   margin-block-start: auto;
   padding-block-start: 4px;
+  flex-wrap: wrap;
 }
 
 .local-clock {
-  font-size: 1.15rem;
+  font-size: clamp(1.05rem, 3.8vw, 1.15rem);
   font-weight: 700;
   color: var(--ink-primary);
   letter-spacing: -0.02em;

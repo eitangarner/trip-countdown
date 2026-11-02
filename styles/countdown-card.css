@@ -151,7 +151,7 @@
   width: 100%;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: clamp(6px, 2vw, 10px);
   direction: ltr;
   unicode-bidi: isolate;
 }
@@ -160,8 +160,8 @@
 .countdown-cell {
   position: relative;
   overflow: hidden;
-  padding-block: 14px 10px;
-  padding-inline: 6px;
+  padding-block: clamp(10px, 3vw, 14px) clamp(8px, 2.5vw, 10px);
+  padding-inline: clamp(4px, 1.8vw, 6px);
   border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(20px) saturate(180%);
@@ -192,7 +192,7 @@
 
 .countdown-value,
 .countdown-digits {
-  font-size: clamp(1.55rem, 6vw, 2.1rem);
+  font-size: clamp(1.28rem, 5.5vw, 2.1rem);
   font-weight: 800;
   line-height: 1.1;
   letter-spacing: -0.03em;

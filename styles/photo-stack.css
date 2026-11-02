@@ -45,6 +45,7 @@
 .days-together-pill .pill-secondary {
   color: var(--ink-secondary);
   font-weight: 500;
+  white-space: nowrap;
 }
 
 /* 3D Swipeable Photo Card Stack (.photo-stack-wrapper & .photo-stack) */
@@ -54,14 +55,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-block: 6px 26px;
+  padding-block: 4px 14px;
   perspective: 1100px;
 }
 
 .photo-stack {
   position: relative;
   width: 100%;
-  max-width: 300px;
+  max-width: min(265px, 72vw);
   aspect-ratio: 4 / 4.6;
   transform-style: preserve-3d;
   touch-action: pan-y;
@@ -393,7 +394,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin-block-start: 28px;
+  margin-block-start: 14px;
 }
 
 .photo-dots {

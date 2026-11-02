@@ -5,8 +5,38 @@
  */
 
 /* ==========================================================================
-   13. Responsive Breakpoints (Tablet & Desktop >= 540px)
+   13. Responsive Breakpoints (Mobile < 540px and Tablet/Desktop >= 540px)
    ========================================================================== */
+
+@media (max-width: 539.98px) {
+  .fab-edit-btn:not([hidden]) {
+    display: none;
+  }
+}
+
+@media (max-width: 379.98px) {
+  .app-shell,
+  .board-container,
+  main {
+    padding-inline: 12px;
+    gap: 16px;
+  }
+
+  .countdown-card {
+    padding-inline: 14px;
+    padding-block: 18px 16px;
+  }
+
+  .person-status-card {
+    padding-inline: 10px;
+    padding-block: 12px 10px;
+  }
+
+  .bottom-nav-item {
+    min-width: 105px;
+    padding-inline: 12px;
+  }
+}
 
 @media (min-width: 540px) {
   .app-shell,
@@ -14,6 +44,10 @@
   main {
     padding-inline: 24px;
     gap: 24px;
+  }
+
+  .status-header-update-btn {
+    display: none;
   }
 
   .photo-stack {

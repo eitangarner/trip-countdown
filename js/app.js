@@ -18,6 +18,7 @@ import {
 import { PhotoStackController, createPhotoDateElement } from './photo-stack.js';
 import { TimelineRenderer } from './timeline-renderer.js';
 import { DaysBreakdownModal, EventCountdownModal } from './ui-modals.js';
+import { bindTabSwipeGestures } from './ui-gestures.js';
 import {
   StatusEditSheet,
   applyStatusOverrideToLiveState,
@@ -136,6 +137,9 @@ export class CountdownBoardApp {
       togetherProgressFill: document.getElementById('together-progress-fill'),
 
       subMilestoneBanner: document.getElementById('sub-milestone-banner'),
+
+      statusCardPrimary: document.getElementById('status-card-primary'),
+      statusCardSecondary: document.getElementById('status-card-secondary'),
 
       autoSyncIndicator: document.getElementById('auto-sync-indicator'),
       primaryNameLabel: document.getElementById('primary-name-label'),
@@ -471,6 +475,52 @@ export class CountdownBoardApp {
 
     this.dom.addTimelineItemBtn?.addEventListener('click', () => {
       this.timelineEditorSheet.open(null);
+    });
+
+    const handlePrimaryCardClick = () => {
+      this.statusEditSheet.open(this.latestBoardState, 'primary');
+    };
+    this.dom.statusCardPrimary?.addEventListener('click', handlePrimaryCardClick);
+    this.dom.statusCardPrimary?.addEventListener('keydown', (keyboardEvent) => {
+      if (keyboardEvent.key === 'Enter' || keyboardEvent.key === ' ') {
+        keyboardEvent.preventDefault();
+        handlePrimaryCardClick();
+      }
+    });
+
+    const handleSecondaryCardClick = () => {
+      this.statusEditSheet.open(this.latestBoardState, 'secondary');
+    };
+    this.dom.statusCardSecondary?.addEventListener('click', handleSecondaryCardClick);
+    this.dom.statusCardSecondary?.addEventListener('keydown', (keyboardEvent) => {
+      if (keyboardEvent.key === 'Enter' || keyboardEvent.key === ' ') {
+        keyboardEvent.preventDefault();
+        handleSecondaryCardClick();
+      }
+    });
+
+    this.unbindTabSwipe = bindTabSwipeGestures({
+      containerElement: this.dom.boardContainer,
+      onSwipeLeft: () => {
+        if (this.activeView === 'countdown') {
+          this.switchView('timeline');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      },
+      onSwipeRight: () => {
+        if (this.activeView === 'timeline') {
+          this.switchView('countdown');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      },
+      isSwipeEnabled: () => {
+        return (
+          !this.statusEditSheet.isOpen() &&
+          !this.timelineEditorSheet.isOpen() &&
+          !this.eventCountdownModal.isOpen() &&
+          !this.daysBreakdownModal.isOpen()
+        );
+      }
     });
 
     this.dom.lockDeviceBtn?.addEventListener('click', () => {

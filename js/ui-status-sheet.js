@@ -150,7 +150,8 @@ export class StatusEditSheet {
       noteInput: /** @type {HTMLInputElement | null} */ (document.getElementById('edit-current-note')),
       clearStatusOverridesBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('clear-status-overrides-btn')),
       lockDeviceBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('lock-device-btn')),
-      fabEditBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('fab-edit-btn'))
+      fabEditBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('fab-edit-btn')),
+      statusHeaderUpdateBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('status-header-update-btn'))
     };
   }
 
@@ -159,6 +160,10 @@ export class StatusEditSheet {
     const { signal } = this.#abortController;
 
     this.#dom.fabEditBtn?.addEventListener('click', () => {
+      this.open(this.#latestBoardState);
+    }, { signal });
+
+    this.#dom.statusHeaderUpdateBtn?.addEventListener('click', () => {
       this.open(this.#latestBoardState);
     }, { signal });
 
@@ -273,10 +278,13 @@ export class StatusEditSheet {
 
   /**
    * @param {import('./config.js').EvaluatedBoardState | null} [boardState]
+   * @param {'primary' | 'secondary' | null} [preferredProfile]
    */
-  open(boardState = null) {
+  open(boardState = null, preferredProfile = null) {
     if (!this.#tripConfig) return;
-    if (boardState) {
+    if (preferredProfile === 'primary' || preferredProfile === 'secondary') {
+      this.setActiveProfile(preferredProfile, boardState);
+    } else if (boardState) {
       this.syncForm(boardState);
     }
     this.#dom.sheetBackdrop?.classList.add('is-open');

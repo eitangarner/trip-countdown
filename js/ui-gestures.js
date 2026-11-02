@@ -167,3 +167,90 @@ export function bindSheetDragGestures(sheetElement, dragTargetElement, onClose, 
     resetSheetTransforms();
   };
 }
+
+/**
+ * Binds horizontal swipe gestures to a container to switch between views.
+ *
+ * @param {object} options
+ * @param {HTMLElement | null} options.containerElement
+ * @param {() => void} options.onSwipeLeft
+ * @param {() => void} options.onSwipeRight
+ * @param {() => boolean} [options.isSwipeEnabled]
+ * @param {number} [options.swipeThresholdPx=48]
+ * @param {number} [options.velocityThreshold=0.3]
+ * @returns {() => void} Unbind cleanup function
+ */
+export function bindTabSwipeGestures({
+  containerElement,
+  onSwipeLeft,
+  onSwipeRight,
+  isSwipeEnabled = () => true,
+  swipeThresholdPx = 48,
+  velocityThreshold = 0.3
+}) {
+  if (!containerElement || typeof window === 'undefined') {
+    return () => {};
+  }
+
+  let startX = 0;
+  let startY = 0;
+  let startTimeMs = 0;
+  let isTracking = false;
+
+  const handleTouchStart = (/** @type {TouchEvent} */ touchEvent) => {
+    if (touchEvent.touches.length !== 1) return;
+    if (!isSwipeEnabled()) return;
+
+    const target = /** @type {HTMLElement | null} */ (touchEvent.target);
+    if (target?.closest?.('.photo-stack, .edit-bottom-sheet, .event-modal, input, select, textarea, button, [role="dialog"]')) {
+      return;
+    }
+
+    const touch = touchEvent.touches[0];
+    startX = touch.clientX;
+    startY = touch.clientY;
+    startTimeMs = Date.now();
+    isTracking = true;
+  };
+
+  const handleTouchEnd = (/** @type {TouchEvent} */ touchEvent) => {
+    if (!isTracking) return;
+    isTracking = false;
+
+    if (touchEvent.changedTouches.length === 0) return;
+    const touch = touchEvent.changedTouches[0];
+    const deltaX = touch.clientX - startX;
+    const deltaY = touch.clientY - startY;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    if (absX < swipeThresholdPx || absX < absY * 1.4) {
+      return;
+    }
+
+    const durationMs = Math.max(1, Date.now() - startTimeMs);
+    const velocity = absX / durationMs;
+
+    if (absX >= swipeThresholdPx || velocity >= velocityThreshold) {
+      if (deltaX < 0) {
+        onSwipeLeft();
+      } else {
+        onSwipeRight();
+      }
+    }
+  };
+
+  const handleTouchCancel = () => {
+    isTracking = false;
+  };
+
+  containerElement.addEventListener('touchstart', handleTouchStart, { passive: true });
+  containerElement.addEventListener('touchend', handleTouchEnd, { passive: true });
+  containerElement.addEventListener('touchcancel', handleTouchCancel, { passive: true });
+
+  return () => {
+    containerElement.removeEventListener('touchstart', handleTouchStart);
+    containerElement.removeEventListener('touchend', handleTouchEnd);
+    containerElement.removeEventListener('touchcancel', handleTouchCancel);
+  };
+}

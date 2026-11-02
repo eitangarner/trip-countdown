@@ -130,13 +130,19 @@
       <!-- Section 2: "Where We Are Now" Dual Status & Time-Zone Bridge -->
       <section class="status-section" aria-label="Where We Are Now">
         <div class="section-header-row">
-          <h3 class="section-title">Where We Are Now</h3>
-          <span class="tz-code-label" id="auto-sync-indicator" hidden>✨ Synced to Reunion</span>
+          <div class="section-title-group">
+            <h3 class="section-title">Where We Are Now</h3>
+            <span class="tz-code-label" id="auto-sync-indicator" hidden>✨ Synced to Reunion</span>
+          </div>
+          <button type="button" class="status-header-update-btn" id="status-header-update-btn" aria-label="Update location status">
+            <span>📍</span>
+            <span>Update</span>
+          </button>
         </div>
 
         <div class="dual-status-grid">
           <!-- Partner A Status Card -->
-          <article class="person-status-card" data-person="primary" id="status-card-primary">
+          <article class="person-status-card is-interactive" data-person="primary" id="status-card-primary" role="button" tabindex="0" aria-label="Update Partner 1 status">
             <div class="person-card-header">
               <span class="person-name-tag">
                 <span class="person-dot"></span>
@@ -155,7 +161,7 @@
           </article>
 
           <!-- Partner B Status Card -->
-          <article class="person-status-card" data-person="secondary" id="status-card-secondary">
+          <article class="person-status-card is-interactive" data-person="secondary" id="status-card-secondary" role="button" tabindex="0" aria-label="Update Partner 2 status">
             <div class="person-card-header">
               <span class="person-name-tag">
                 <span class="person-dot"></span>

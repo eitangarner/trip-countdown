@@ -45,6 +45,8 @@
   user-select: none;
   white-space: nowrap;
   box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: transform var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast), color var(--transition-fast);
 }
 
@@ -333,6 +335,7 @@
 
 .milestone-card-delete-btn,
 .reunion-card-delete-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -346,7 +349,15 @@
   cursor: pointer;
   padding: 0;
   line-height: 1;
+  touch-action: manipulation;
   transition: transform var(--transition-fast), background-color var(--transition-fast);
+}
+
+.milestone-card-delete-btn::after,
+.reunion-card-delete-btn::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
 }
 
 .milestone-card-delete-btn:hover,
@@ -422,6 +433,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .reunion-title-group {
@@ -490,6 +502,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
   padding-block: 9px;
   padding-inline: 12px;
   border-radius: var(--radius-md);
