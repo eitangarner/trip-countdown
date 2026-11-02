@@ -287,14 +287,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
+  flex-wrap: nowrap;
+  width: 100%;
 }
 
 .milestone-date-col {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .milestone-date {
@@ -307,30 +310,37 @@
 .milestone-country-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   font-size: 0.72rem;
   font-weight: 550;
   color: var(--ink-muted);
   opacity: 0.88;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
 }
 
 .milestone-person-tag {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   padding-block: 2px;
-  padding-inline: 8px;
+  padding-inline: 6px;
   border-radius: var(--radius-pill);
   background: var(--surface-glass-subtle);
   border: 1px solid var(--surface-border);
   color: var(--ink-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .milestone-actions-group {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .milestone-card-delete-btn,
@@ -438,9 +448,10 @@
 
 .reunion-title-group {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   min-width: 0;
+  flex: 1;
 }
 
 .reunion-emoji {
@@ -450,6 +461,7 @@
   font-size: 1.65rem;
   line-height: 1;
   flex-shrink: 0;
+  margin-block-start: 2px;
 }
 
 .reunion-title-stack {
@@ -458,6 +470,7 @@
   justify-content: center;
   gap: 4px;
   min-width: 0;
+  flex: 1;
 }
 
 .reunion-title {
@@ -468,6 +481,14 @@
   color: var(--ink-primary);
 }
 
+.reunion-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-block-start: 2px;
+}
+
 .reunion-date-range {
   margin-block-start: 0;
   width: fit-content;
@@ -475,13 +496,14 @@
 
 .reunion-duration-pill {
   flex-shrink: 0;
-  padding-block: 4px;
-  padding-inline: 10px;
+  padding-block: 3.5px;
+  padding-inline: 9px;
   border-radius: var(--radius-pill);
   background: linear-gradient(135deg, var(--track-primary), var(--track-together));
   color: var(--ink-on-accent);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .reunion-description {

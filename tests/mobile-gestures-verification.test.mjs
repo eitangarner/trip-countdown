@@ -265,6 +265,7 @@ test('Mobile Markup Integrity: index.html contains status header button and inte
 
 test('Mobile Stylesheet Integrity: form inputs avoid iOS zoom and modals have max-height bounds', () => {
   const sheetsCss = fs.readFileSync(path.resolve('styles/sheets-and-modals.css'), 'utf8');
+  const timelineCss = fs.readFileSync(path.resolve('styles/timeline.css'), 'utf8');
 
   // Input font-size must be 1rem (16px) to avoid iOS Safari zoom
   assert.ok(
@@ -276,5 +277,17 @@ test('Mobile Stylesheet Integrity: form inputs avoid iOS zoom and modals have ma
   assert.ok(
     sheetsCss.includes('max-height: min(86dvh'),
     '.event-modal must specify responsive max-height'
+  );
+
+  // Milestone metadata row must prevent wrapping
+  assert.ok(
+    timelineCss.includes('.milestone-meta-row {') && timelineCss.includes('flex-wrap: nowrap;'),
+    '.milestone-meta-row must enforce flex-wrap: nowrap to prevent staggered heights'
+  );
+
+  // Reunion metadata row must exist
+  assert.ok(
+    timelineCss.includes('.reunion-meta-row {'),
+    '.reunion-meta-row must pair date range and duration pill'
   );
 });

@@ -36,6 +36,10 @@
     min-width: 105px;
     padding-inline: 12px;
   }
+
+  .milestone-country-badge {
+    max-width: 78px;
+  }
 }
 
 @media (min-width: 540px) {

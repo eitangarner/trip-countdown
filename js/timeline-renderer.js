@@ -207,14 +207,6 @@ function createReunionCardElement(reunion, boardState, onEditItem = null, onDele
   titleEl.setAttribute('dir', 'auto');
   titleEl.textContent = reunion.title;
 
-  const dateRangeEl = createPhotoDateElement(`${formatDisplayDate(reunion.startDate)} – ${formatDisplayDate(reunion.endDate)}`, { isCompact: true });
-  dateRangeEl.classList.add('reunion-date-range');
-
-  titleStack.appendChild(titleEl);
-  titleStack.appendChild(dateRangeEl);
-  titleGroup.appendChild(emojiSpan);
-  titleGroup.appendChild(titleStack);
-
   const totalDays = getReunionDurationDays(reunion);
   const durationPill = document.createElement('span');
   durationPill.className = 'reunion-duration-pill numeric-lock';
@@ -223,9 +215,17 @@ function createReunionCardElement(reunion, boardState, onEditItem = null, onDele
     ? `Day ${boardState.activeReunion.dayOfReunion} of ${totalDays}`
     : `${totalDays} Days Together`;
 
-  const headerActions = document.createElement('div');
-  headerActions.className = 'milestone-actions-group';
-  headerActions.appendChild(durationPill);
+  const metaRow = document.createElement('div');
+  metaRow.className = 'reunion-meta-row';
+  metaRow.appendChild(dateRangeEl);
+  metaRow.appendChild(durationPill);
+
+  titleStack.appendChild(titleEl);
+  titleStack.appendChild(metaRow);
+  titleGroup.appendChild(emojiSpan);
+  titleGroup.appendChild(titleStack);
+
+  header.appendChild(titleGroup);
 
   const isCustomChapter = String(reunion.id).startsWith('custom-');
   if (onDeleteItem && isCustomChapter) {
@@ -239,11 +239,9 @@ function createReunionCardElement(reunion, boardState, onEditItem = null, onDele
       e.stopPropagation();
       onDeleteItem(reunion);
     });
-    headerActions.appendChild(deleteBtn);
+    header.appendChild(deleteBtn);
   }
 
-  header.appendChild(titleGroup);
-  header.appendChild(headerActions);
   card.appendChild(header);
 
   if (Array.isArray(reunion.legs) && reunion.legs.length > 0) {
