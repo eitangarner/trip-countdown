@@ -1,0 +1,209 @@
+/**
+ * Trip Countdown & Timeline Board
+ * Visual System: Apple Music Lighter Matte Glass & Bidirectional (LTR/RTL) Layout
+ * Status Bar Stylesheet: "Where We Are Now" Dual Status Cards, Clocks & Timezone Bridge
+ */
+
+/* ==========================================================================
+   8. "Where We Are Now" Dual Status Bar (.status-section)
+   ========================================================================== */
+
+.status-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.section-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: 4px;
+}
+
+.section-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+}
+
+.dual-status-grid {
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.person-status-card {
+  position: relative;
+  padding-block: 16px 14px;
+  padding-inline: 14px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-glass);
+  backdrop-filter: var(--blur-matte);
+  -webkit-backdrop-filter: var(--blur-matte);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--surface-shadow);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.person-status-card::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  height: 3.5px;
+  background: var(--track-primary);
+}
+
+.person-status-card[data-person="primary"]::before,
+.person-status-card.person-primary::before {
+  background: var(--track-primary);
+}
+
+.person-status-card[data-person="secondary"]::before,
+.person-status-card.person-secondary::before {
+  background: var(--track-secondary);
+}
+
+.person-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.person-name-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-secondary);
+}
+
+.person-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--track-primary);
+}
+
+.person-status-card[data-person="secondary"] .person-dot,
+.person-status-card.person-secondary .person-dot {
+  background: var(--track-secondary);
+}
+
+.person-country-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.person-flag,
+.country-flag {
+  font-size: 1.55rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.person-country,
+.country-name {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--ink-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.city-note {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  padding-block: 3px;
+  padding-inline: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-glass-subtle);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.city-note:empty {
+  display: none;
+}
+
+.person-clock-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  margin-block-start: auto;
+  padding-block-start: 4px;
+}
+
+.local-clock {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ink-primary);
+  letter-spacing: -0.02em;
+}
+
+.tz-code-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+/* Centered Dedicated Time-Zone Bridge Pill */
+.tz-bridge-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-block-start: 10px;
+}
+
+.tz-bridge-pill {
+  position: static;
+  transform: none;
+  z-index: 2;
+  padding-block: 6px;
+  padding-inline: 13px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass-strong);
+  backdrop-filter: var(--blur-matte);
+  -webkit-backdrop-filter: var(--blur-matte);
+  border: 1.5px solid var(--surface-border);
+  box-shadow: 0 4px 14px -3px rgba(20, 21, 26, 0.1);
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--ink-primary);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tz-bridge-pill.is-same-tz {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ambient-primary) 45%, white),
+    color-mix(in srgb, var(--ambient-secondary) 45%, white)
+  );
+}

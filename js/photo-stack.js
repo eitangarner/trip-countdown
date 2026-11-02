@@ -1,12 +1,16 @@
-/**
- * Swipeable 3D Photo Card Stack Controller & Offscreen Canvas Luminous Palette Extractor.
- * Drives the Apple Music lighter matte-glass ambient background dispersion.
- */
+import {
+  clamp,
+  DEFAULT_LUMINOUS_PALETTE,
+  extractLuminousPalette
+} from './photo-palette.js';
+
+import {
+  createPhotoDateElement
+} from './photo-badge.js';
 
 const SWIPE_THRESHOLD_PX = 45;
 const TAP_SLOP_PX = 8;
 const DEFAULT_AUTOROTATE_MS = 4500;
-const SAMPLE_CANVAS_SIZE = 32;
 
 /**
  * Built-in fallback set of 4 rich SVG illustration cards when no user photos are loaded.
@@ -148,498 +152,9 @@ export const FALLBACK_PHOTOS = [
   }
 ];
 
-/**
- * Converts RGB [0..255] to HSL [h: 0..360, s: 0..100, l: 0..100].
- * @param {number} r
- * @param {number} g
- * @param {number} b
- * @returns {{ h: number, s: number, l: number }}
- */
-export function rgbToHsl(r, g, b) {
-  const rn = r / 255;
-  const gn = g / 255;
-  const bn = b / 255;
-  const max = Math.max(rn, gn, bn);
-  const min = Math.min(rn, gn, bn);
-  const delta = max - min;
 
-  let h = 0;
-  let s = 0;
-  const l = (max + min) / 2;
 
-  if (delta !== 0) {
-    s = delta / (1 - Math.abs(2 * l - 1));
-    switch (max) {
-      case rn:
-        h = ((gn - bn) / delta) % 6;
-        break;
-      case gn:
-        h = (bn - rn) / delta + 2;
-        break;
-      default:
-        h = (rn - gn) / delta + 4;
-        break;
-    }
-    h = Math.round(h * 60);
-    if (h < 0) h += 360;
-  }
 
-  return {
-    h,
-    s: Math.round(s * 100),
-    l: Math.round(l * 100)
-  };
-}
-
-/**
- * Converts HSL [h: 0..360, s: 0..100, l: 0..100] to a 6-digit hex color string.
- * @param {number} h
- * @param {number} s
- * @param {number} l
- * @returns {string}
- */
-export function hslToHex(h, s, l) {
-  const hn = ((h % 360) + 360) % 360;
-  const sn = Math.max(0, Math.min(100, s)) / 100;
-  const ln = Math.max(0, Math.min(100, l)) / 100;
-
-  const c = (1 - Math.abs(2 * ln - 1)) * sn;
-  const x = c * (1 - Math.abs(((hn / 60) % 2) - 1));
-  const m = ln - c / 2;
-
-  let rPrime = 0;
-  let gPrime = 0;
-  let bPrime = 0;
-
-  if (hn < 60) {
-    rPrime = c; gPrime = x; bPrime = 0;
-  } else if (hn < 120) {
-    rPrime = x; gPrime = c; bPrime = 0;
-  } else if (hn < 180) {
-    rPrime = 0; gPrime = c; bPrime = x;
-  } else if (hn < 240) {
-    rPrime = 0; gPrime = x; bPrime = c;
-  } else if (hn < 300) {
-    rPrime = x; gPrime = 0; bPrime = c;
-  } else {
-    rPrime = c; gPrime = 0; bPrime = x;
-  }
-
-  const toHex = (val) => Math.round((val + m) * 255).toString(16).padStart(2, '0');
-  return `#${toHex(rPrime)}${toHex(gPrime)}${toHex(bPrime)}`;
-}
-
-/**
- * Parses a hex string (#rgb or #rrggbb) into RGB [0..255].
- * @param {string} hex
- * @returns {{ r: number, g: number, b: number } | null}
- */
-function parseHexColor(hex) {
-  if (typeof hex !== 'string') return null;
-  const cleaned = hex.trim().replace(/^#/, '');
-  if (cleaned.length === 3) {
-    return {
-      r: parseInt(cleaned[0] + cleaned[0], 16),
-      g: parseInt(cleaned[1] + cleaned[1], 16),
-      b: parseInt(cleaned[2] + cleaned[2], 16)
-    };
-  }
-  if (cleaned.length === 6) {
-    return {
-      r: parseInt(cleaned.slice(0, 2), 16),
-      g: parseInt(cleaned.slice(2, 4), 16),
-      b: parseInt(cleaned.slice(4, 6), 16)
-    };
-  }
-  return null;
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
-const DEFAULT_LUMINOUS_PALETTE = {
-  primary: '#f6b8d0',
-  secondary: '#b8d8f8',
-  tertiary: '#fbd3a7',
-  quaternary: '#d5bdf8',
-  accent: '#e86f9a'
-};
-
-/**
- * Clamps an HSL color to the DESIGN.md luminous pastel range:
- * - ambient ('primary' | 'secondary' | 'tertiary' | 'quaternary'): Lightness 68%–84%, Saturation 65%–90%
- * - interactive ('accent'): Lightness 48%–58%, Saturation 65%–90%
- * @param {{ h: number, s: number, l: number }} hsl
- * @param {'primary' | 'secondary' | 'tertiary' | 'quaternary' | 'accent'} role
- * @returns {string} Clamped hex color
- */
-export function clampHslForRole(hsl, role = 'primary') {
-  const s = clamp(hsl.s, 66, 89);
-  const l = role === 'accent'
-    ? clamp(hsl.l, 49, 57)
-    : clamp(hsl.l, 69, 83);
-  return hslToHex(hsl.h, s, l);
-}
-
-function circularHueBucketDistance(bucketIdxA, bucketIdxB) {
-  const diff = Math.abs(bucketIdxA - bucketIdxB);
-  return Math.min(diff, 12 - diff);
-}
-
-function bucketToAverageHsl(bucket) {
-  return rgbToHsl(
-    bucket.rSum / bucket.weightSum,
-    bucket.gSum / bucket.weightSum,
-    bucket.bSum / bucket.weightSum
-  );
-}
-
-function expandHslListToFourRoles(seedHsls) {
-  const expanded = [...seedHsls];
-  const harmonicHueOffsets = [28, -28, 52];
-  const lightnessOffsets = [5, -5, 8];
-
-  while (expanded.length < 4) {
-    const stepIdx = expanded.length - 1;
-    const baseHsl = seedHsls[expanded.length % seedHsls.length];
-    expanded.push({
-      h: ((baseHsl.h + harmonicHueOffsets[stepIdx % harmonicHueOffsets.length]) % 360 + 360) % 360,
-      s: baseHsl.s,
-      l: clamp(baseHsl.l + lightnessOffsets[stepIdx % lightnessOffsets.length], 69, 83)
-    });
-  }
-
-  return expanded;
-}
-
-function buildClampedPalette(seedHsls, accentHsl = null) {
-  const [primaryHsl, secondaryHsl, tertiaryHsl, quaternaryHsl] = expandHslListToFourRoles(seedHsls);
-  const resolvedAccentHsl = accentHsl || {
-    h: primaryHsl.h,
-    s: Math.max(primaryHsl.s, 75),
-    l: 53
-  };
-
-  return {
-    primary: clampHslForRole(primaryHsl, 'primary'),
-    secondary: clampHslForRole(secondaryHsl, 'secondary'),
-    tertiary: clampHslForRole(tertiaryHsl, 'tertiary'),
-    quaternary: clampHslForRole(quaternaryHsl, 'quaternary'),
-    accent: clampHslForRole(resolvedAccentHsl, 'accent')
-  };
-}
-
-/**
- * Samples RGBA pixel buffer and extracts a 4-color luminous pastel palette plus interactive accent.
- * @param {Uint8ClampedArray | number[]} rgbaData
- * @returns {{ primary: string, secondary: string, tertiary: string, quaternary: string, accent: string }}
- */
-function extractPaletteFromPixels(rgbaData) {
-  const buckets = Array.from({ length: 12 }, () => ({
-    count: 0,
-    rSum: 0,
-    gSum: 0,
-    bSum: 0,
-    weightSum: 0
-  }));
-
-  for (let i = 0; i <= rgbaData.length - 4; i += 4) {
-    const r = rgbaData[i];
-    const g = rgbaData[i + 1];
-    const b = rgbaData[i + 2];
-    const a = rgbaData[i + 3];
-    if (a < 128) continue;
-
-    const { h, s, l } = rgbToHsl(r, g, b);
-    // Favor vibrant mid-tone pixels over near-black or near-white pixels
-    const vibrancyWeight = (s / 100) * (1 - Math.abs(l - 55) / 65) + 0.1;
-    const bucketIdx = Math.floor(h / 30) % 12;
-    const bucket = buckets[bucketIdx];
-    bucket.count += 1;
-    bucket.rSum += r * vibrancyWeight;
-    bucket.gSum += g * vibrancyWeight;
-    bucket.bSum += b * vibrancyWeight;
-    bucket.weightSum += vibrancyWeight;
-  }
-
-  const rankedBuckets = buckets
-    .map((bucket, idx) => ({ ...bucket, idx }))
-    .filter((bucket) => bucket.weightSum > 0)
-    .sort((a, b) => b.weightSum - a.weightSum);
-
-  if (rankedBuckets.length === 0) {
-    return { ...DEFAULT_LUMINOUS_PALETTE };
-  }
-
-  const dominant = rankedBuckets[0];
-  const viableBuckets = rankedBuckets.filter((bucket) => bucket.weightSum >= dominant.weightSum * 0.03);
-  const selectedBuckets = [dominant];
-
-  // First pass: prefer buckets with distinct hues (>= 60 deg apart on the 12-hue wheel)
-  for (const candidate of viableBuckets) {
-    if (selectedBuckets.length >= 4) break;
-    const isDistinctFromSelected = selectedBuckets.every(
-      (chosen) => circularHueBucketDistance(candidate.idx, chosen.idx) >= 2
-    );
-    if (isDistinctFromSelected) {
-      selectedBuckets.push(candidate);
-    }
-  }
-
-  // Second pass: include remaining viable buckets if fewer than 4 distinct clusters exist
-  for (const candidate of viableBuckets) {
-    if (selectedBuckets.length >= 4) break;
-    if (!selectedBuckets.includes(candidate)) {
-      selectedBuckets.push(candidate);
-    }
-  }
-
-  return buildClampedPalette(selectedBuckets.map(bucketToAverageHsl));
-}
-
-/**
- * Extracts a luminous Apple Music matte-glass palette from an image element, canvas,
- * ImageData buffer, VaultPhoto object, or SVG/hex string.
- * Clamps lightness to 68%–84% and saturation to 65%–90% for primary/secondary/tertiary/quaternary,
- * and lightness 48%–58% for accent.
- *
- * @param {HTMLImageElement | HTMLCanvasElement | ImageData | import('./config.js').VaultPhoto | string | null} imageSource
- * @returns {{ primary: string, secondary: string, tertiary: string, quaternary: string, accent: string } | null}
- */
-export function extractLuminousPalette(imageSource) {
-  if (!imageSource) {
-    return { ...DEFAULT_LUMINOUS_PALETTE };
-  }
-
-  // 1. Direct ImageData or pixel buffer object ({ data: Uint8ClampedArray })
-  if (imageSource.data && (imageSource.data instanceof Uint8ClampedArray || Array.isArray(imageSource.data))) {
-    return extractPaletteFromPixels(imageSource.data);
-  }
-
-  // 2. HTMLImageElement or HTMLCanvasElement in browser DOM
-  if (typeof document !== 'undefined' && (
-    (typeof HTMLImageElement !== 'undefined' && imageSource instanceof HTMLImageElement) ||
-    (typeof HTMLCanvasElement !== 'undefined' && imageSource instanceof HTMLCanvasElement)
-  )) {
-    try {
-      if (typeof HTMLImageElement !== 'undefined' && imageSource instanceof HTMLImageElement) {
-        if (!imageSource.complete || imageSource.naturalWidth === 0) {
-          return null;
-        }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = SAMPLE_CANVAS_SIZE;
-      canvas.height = SAMPLE_CANVAS_SIZE;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      if (ctx) {
-        ctx.drawImage(imageSource, 0, 0, SAMPLE_CANVAS_SIZE, SAMPLE_CANVAS_SIZE);
-        const imageData = ctx.getImageData(0, 0, SAMPLE_CANVAS_SIZE, SAMPLE_CANVAS_SIZE);
-        return extractPaletteFromPixels(imageData.data);
-      }
-    } catch {
-      // Fallback if cross-origin or incomplete image decode
-    }
-  }
-
-  // 3. VaultPhoto object with pre-extracted palette or dataUrl
-  if (typeof imageSource === 'object' && imageSource !== null) {
-    if (imageSource._extractedPalette) {
-      return imageSource._extractedPalette;
-    }
-    const isSvg = !imageSource.dataUrl || imageSource.dataUrl.includes('data:image/svg+xml');
-    if (isSvg && imageSource.palette && imageSource.palette.primary) {
-      const roleHexes = [
-        imageSource.palette.primary,
-        imageSource.palette.secondary,
-        imageSource.palette.tertiary,
-        imageSource.palette.quaternary
-      ].filter(Boolean);
-      const parsedHsls = roleHexes
-        .map(parseHexColor)
-        .filter(Boolean)
-        .map((rgb) => rgbToHsl(rgb.r, rgb.g, rgb.b));
-      const aRgb = parseHexColor(imageSource.palette.accent || imageSource.palette.primary);
-
-      if (parsedHsls.length > 0 && aRgb) {
-        return buildClampedPalette(parsedHsls, rgbToHsl(aRgb.r, aRgb.g, aRgb.b));
-      }
-    }
-    if (typeof imageSource.dataUrl === 'string' && isSvg) {
-      return extractLuminousPalette(imageSource.dataUrl);
-    }
-  }
-
-  // 4. String source (hex color or SVG data URL containing hex stops)
-  if (typeof imageSource === 'string') {
-    const decoded = imageSource.includes('%23') ? decodeURIComponent(imageSource) : imageSource;
-    const hexMatches = decoded.match(/#[0-9a-fA-F]{6}\b/g);
-    if (hexMatches && hexMatches.length > 0) {
-      const uniqueHexes = [...new Set(hexMatches.map((h) => h.toLowerCase()))].slice(0, 4);
-      const parsedHsls = uniqueHexes
-        .map(parseHexColor)
-        .filter(Boolean)
-        .map((rgb) => rgbToHsl(rgb.r, rgb.g, rgb.b));
-      if (parsedHsls.length > 0) {
-        return buildClampedPalette(parsedHsls);
-      }
-    }
-  }
-
-  return { ...DEFAULT_LUMINOUS_PALETTE };
-}
-
-function parseDateParts(str) {
-  if (!str || typeof str !== 'string') return null;
-  const trimmed = str.trim();
-  const dmyMatch = trimmed.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
-  const ymdMatch = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
-  if (dmyMatch) {
-    const rawYear = dmyMatch[3];
-    const year = rawYear.length === 2 ? `20${rawYear}` : rawYear;
-    return {
-      day: dmyMatch[1].padStart(2, '0'),
-      month: dmyMatch[2].padStart(2, '0'),
-      year
-    };
-  }
-  if (ymdMatch) {
-    return {
-      day: ymdMatch[3].padStart(2, '0'),
-      month: ymdMatch[2].padStart(2, '0'),
-      year: ymdMatch[1]
-    };
-  }
-  return null;
-}
-
-/**
- * Creates an elegant calendar-sheet date badge with separate "pages" for day, month, and year.
- * Also supports date ranges (e.g. "31-12-2026 – 10-01-2027").
- * If dateLabel does not match a standard calendar date, returns a fallback single pill.
- * @param {string} dateLabel
- * @param {{ isCompact?: boolean }} [options]
- * @returns {HTMLElement}
- */
-export function createPhotoDateElement(dateLabel, { isCompact = false } = {}) {
-  const rangeSplit = typeof dateLabel === 'string' ? dateLabel.split(/\s+[–—]\s+/) : null;
-  if (rangeSplit && rangeSplit.length === 2) {
-    const startParts = parseDateParts(rangeSplit[0]);
-    const endParts = parseDateParts(rangeSplit[1]);
-    if (startParts && endParts) {
-      const rangeContainer = document.createElement('div');
-      rangeContainer.className = `photo-date-range-container${isCompact ? ' is-compact' : ''} numeric-lock`;
-      rangeContainer.setAttribute('dir', 'ltr');
-      rangeContainer.setAttribute('aria-label', `Date: ${startParts.day}-${startParts.month}-${startParts.year} – ${endParts.day}-${endParts.month}-${endParts.year}`);
-
-      const startPill = document.createElement('div');
-      startPill.className = isCompact ? 'photo-date-pages date-pages-compact' : 'photo-date-pages';
-
-      const startUnits = [
-        { val: startParts.day, cls: 'date-page-day' },
-        { val: startParts.month, cls: 'date-page-month' },
-        { val: startParts.year, cls: 'date-page-year' }
-      ];
-
-      for (const unit of startUnits) {
-        const page = document.createElement('div');
-        page.className = `date-page ${unit.cls}`;
-        const value = document.createElement('span');
-        value.className = 'date-page-value';
-        value.textContent = unit.val;
-        page.appendChild(value);
-        startPill.appendChild(page);
-      }
-
-      const sep = document.createElement('span');
-      sep.className = 'date-page-range-sep';
-      sep.textContent = '–';
-
-      const endPill = document.createElement('div');
-      endPill.className = isCompact ? 'photo-date-pages date-pages-compact' : 'photo-date-pages';
-
-      const endUnits = [
-        { val: endParts.day, cls: 'date-page-day' },
-        { val: endParts.month, cls: 'date-page-month' },
-        { val: endParts.year, cls: 'date-page-year' }
-      ];
-
-      for (const unit of endUnits) {
-        const page = document.createElement('div');
-        page.className = `date-page ${unit.cls}`;
-        const value = document.createElement('span');
-        value.className = 'date-page-value';
-        value.textContent = unit.val;
-        page.appendChild(value);
-        endPill.appendChild(page);
-      }
-
-      rangeContainer.appendChild(startPill);
-      rangeContainer.appendChild(sep);
-      rangeContainer.appendChild(endPill);
-
-      return rangeContainer;
-    }
-  }
-
-  const singleParts = parseDateParts(dateLabel);
-  if (!singleParts) {
-    if (rangeSplit && rangeSplit.length === 2) {
-      const rangeContainer = document.createElement('div');
-      rangeContainer.className = `photo-date-range-container${isCompact ? ' is-compact' : ''} numeric-lock`;
-      rangeContainer.setAttribute('dir', 'ltr');
-
-      const startPill = document.createElement('div');
-      startPill.className = isCompact ? 'timeline-date-pill' : 'photo-date-pill';
-      startPill.textContent = rangeSplit[0];
-
-      const sep = document.createElement('span');
-      sep.className = 'date-page-range-sep';
-      sep.textContent = '–';
-
-      const endPill = document.createElement('div');
-      endPill.className = isCompact ? 'timeline-date-pill' : 'photo-date-pill';
-      endPill.textContent = rangeSplit[1];
-
-      rangeContainer.appendChild(startPill);
-      rangeContainer.appendChild(sep);
-      rangeContainer.appendChild(endPill);
-      return rangeContainer;
-    }
-
-    const singlePill = document.createElement('div');
-    singlePill.className = `${isCompact ? 'timeline-date-pill' : 'photo-date-pill'} numeric-lock`;
-    singlePill.setAttribute('dir', 'ltr');
-    singlePill.textContent = dateLabel;
-    return singlePill;
-  }
-
-  const { day, month, year } = singleParts;
-  const pagesContainer = document.createElement('div');
-  pagesContainer.className = `${isCompact ? 'photo-date-pages date-pages-compact' : 'photo-date-pages'} numeric-lock`;
-  pagesContainer.setAttribute('dir', 'ltr');
-  pagesContainer.setAttribute('aria-label', `Date: ${day}-${month}-${year}`);
-
-  const units = [
-    { val: day, cls: 'date-page-day' },
-    { val: month, cls: 'date-page-month' },
-    { val: year, cls: 'date-page-year' }
-  ];
-
-  for (const unit of units) {
-    const page = document.createElement('div');
-    page.className = `date-page ${unit.cls}`;
-
-    const value = document.createElement('span');
-    value.className = 'date-page-value';
-    value.textContent = unit.val;
-
-    page.appendChild(value);
-    pagesContainer.appendChild(page);
-  }
-
-  return pagesContainer;
-}
 
 /**
  * Interactive 3D Photo Card Stack Controller.
@@ -948,6 +463,7 @@ export class PhotoStackController {
 
     if (outgoingCard) {
       outgoingCard.classList.remove('is-swiping');
+      outgoingCard.style.transform = '';
       outgoingCard.classList.add(throwDirection === 'end' ? 'is-throwing-end' : 'is-throwing-start');
       setTimeout(() => {
         this.updateStackDepths();
@@ -1211,3 +727,21 @@ export class PhotoStackController {
     }
   }
 }
+
+export {
+  rgbToHsl,
+  hslToHex,
+  parseHexColor,
+  clamp,
+  clampHslForRole,
+  extractPaletteFromPixels,
+  extractLuminousPalette,
+  DEFAULT_LUMINOUS_PALETTE,
+  SAMPLE_CANVAS_SIZE,
+  PASTEL_BOUNDS
+} from './photo-palette.js';
+
+export {
+  parseDateParts,
+  createPhotoDateElement
+} from './photo-badge.js';

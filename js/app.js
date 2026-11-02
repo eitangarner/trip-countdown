@@ -1,8 +1,9 @@
-import {
-  ALL_ISO_3166_CODES,
-  PINNED_COUNTRY_CODES,
-  getCountryInfo
-} from './config.js';
+/**
+ * Trip Countdown & Timeline Board
+ * Streamlined Application Lifecycle & Board State Coordinator
+ */
+
+import { getCountryInfo } from './config.js';
 import {
   clearCachedVault,
   getVaultCryptoKey,
@@ -10,21 +11,24 @@ import {
   unlockAndCacheVault
 } from './crypto-vault.js';
 import {
-  decomposeRemainingMs,
   evaluateBoardState,
-  formatDisplayDate,
   formatShortDisplayDate,
-  getEndOfDayInTimeZoneMs,
-  getStartOfDayInTimeZoneMs,
-  getZonedDateParts,
   resolvePartnerConfigMeta
 } from './countdown-engine.js';
 import { PhotoStackController, createPhotoDateElement } from './photo-stack.js';
+import { TimelineRenderer } from './timeline-renderer.js';
+import { DaysBreakdownModal, EventCountdownModal } from './ui-modals.js';
 import {
-  isReunionChapter,
-  resolveMilestonePersonMeta,
-  TimelineRenderer
-} from './timeline-renderer.js';
+  StatusEditSheet,
+  applyStatusOverrideToLiveState,
+  clearStatusOverrideInLiveState
+} from './ui-status-sheet.js';
+import {
+  TimelineEditorSheet,
+  applyTimelineDeleteToLiveState,
+  applyTimelineSaveToLiveState
+} from './ui-editor-sheet.js';
+import { PreviewBannerController } from './ui-preview-banner.js';
 import {
   clearLocalLiveState,
   loadLiveState,
@@ -40,63 +44,12 @@ import {
 function formatUtcOffsetLabel(offsetMinutes) {
   if (offsetMinutes === 0) return 'UTC';
   const sign = offsetMinutes > 0 ? '+' : '-';
-  const absMins = Math.abs(offsetMinutes);
-  const hours = Math.floor(absMins / 60);
-  const mins = absMins % 60;
-  return mins === 0 ? `UTC${sign}${hours}` : `UTC${sign}${hours}:${String(mins).padStart(2, '0')}`;
-}
-
-/**
- * Adds whole calendar days to a "YYYY-MM-DD" date string using UTC calendar arithmetic.
- * @param {string} dateStr
- * @param {number} daysToAdd
- * @returns {string}
- */
-function addCalendarDays(dateStr, daysToAdd) {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const d = new Date(Date.UTC(year, month - 1, day + daysToAdd));
-  const y = String(d.getUTCFullYear()).padStart(4, '0');
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${dd}`;
-}
-
-/**
- * Populates a <select> element with Pinned Trip Countries at the top and all 249 ISO countries alphabetically below.
- * @param {HTMLSelectElement | null} selectEl
- * @param {string} selectedCode
- * @param {string[]} [pinnedCodes]
- */
-function populateCountrySelect(selectEl, selectedCode = 'US', pinnedCodes = PINNED_COUNTRY_CODES) {
-  if (!selectEl) return;
-  selectEl.innerHTML = '';
-
-  const pinnedGroup = document.createElement('optgroup');
-  pinnedGroup.label = '⭐ Pinned Destinations';
-  for (const code of pinnedCodes) {
-    const info = getCountryInfo(code);
-    if (!info) continue;
-    const opt = document.createElement('option');
-    opt.value = info.code;
-    opt.textContent = `${info.flag} ${info.name}`;
-    pinnedGroup.appendChild(opt);
-  }
-
-  const allGroup = document.createElement('optgroup');
-  allGroup.label = '🌍 All 249 Countries (A–Z)';
-  const sortedAll = ALL_ISO_3166_CODES
-    .map((code) => getCountryInfo(code))
-    .sort((a, b) => a.name.localeCompare(b.name));
-  for (const info of sortedAll) {
-    const opt = document.createElement('option');
-    opt.value = info.code;
-    opt.textContent = `${info.flag} ${info.name}`;
-    allGroup.appendChild(opt);
-  }
-
-  selectEl.appendChild(pinnedGroup);
-  selectEl.appendChild(allGroup);
-  selectEl.value = selectedCode;
+  const absoluteMinutes = Math.abs(offsetMinutes);
+  const hours = Math.floor(absoluteMinutes / 60);
+  const minutesRemainder = absoluteMinutes % 60;
+  return minutesRemainder === 0
+    ? `UTC${sign}${hours}`
+    : `UTC${sign}${hours}:${String(minutesRemainder).padStart(2, '0')}`;
 }
 
 export class CountdownBoardApp {
@@ -109,11 +62,8 @@ export class CountdownBoardApp {
   /** @type {import('./config.js').TripConfig | null} */
   #tripConfig = null;
 
-  /** @type { ReturnType<typeof setInterval> | null } */
+  /** @type {ReturnType<typeof setInterval> | null} */
   #tickIntervalId = null;
-
-  /** @type {import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter | null} */
-  #activeEventModalItem = null;
 
   constructor() {
     /** @type {{ owner: string, repo: string, branch: string, path: string } | null} */
@@ -132,29 +82,13 @@ export class CountdownBoardApp {
     };
 
     this.activeView = 'countdown';
-    /** @type {'primary' | 'secondary'} */
-    this.activeProfile = 'primary';
-    /** @type {'milestone' | 'chapter'} */
-    this.timelineEditorMode = 'milestone';
     this.lastTimelineSignature = '';
     this.lastSoonerMilestoneSignature = '';
+    /** @type {import('./config.js').EvaluatedBoardState | null} */
+    this.latestBoardState = null;
 
     this.cacheDomElements();
-    this.photoStack = new PhotoStackController({
-      container: this.dom.photoStackContainer,
-      ambientContainer: this.dom.ambientStage,
-      deferInitialRender: true
-    });
-    this.timelineRenderer = new TimelineRenderer({
-      statsPillEl: this.dom.tripStatsPill,
-      pastToggleBtn: this.dom.pastChaptersToggle,
-      pastDrawerEl: this.dom.pastChaptersDrawer,
-      upcomingTrackEl: this.dom.timelineUpcomingTrack,
-      onEditItem: (item) => this.openEventModal(item),
-      onDeleteItem: (item) => this.deleteTimelineItem(item),
-      onEditLeg: (reunion, legIndex) => this.openTimelineItemEditor(reunion, legIndex),
-      onOpenDaysBreakdown: () => this.openDaysBreakdownModal()
-    });
+    this.initSubControllers();
   }
 
   cacheDomElements() {
@@ -191,7 +125,6 @@ export class CountdownBoardApp {
       cdMinutes: document.getElementById('cd-minutes'),
       cdSeconds: document.getElementById('cd-seconds'),
       separationProgressContainer: document.getElementById('separation-progress-container'),
-      separationProgressLabel: document.getElementById('separation-progress-label'),
       separationProgressPct: document.getElementById('separation-progress-pct'),
       separationProgressFill: document.getElementById('separation-progress-fill'),
 
@@ -199,7 +132,6 @@ export class CountdownBoardApp {
       togetherLegBadge: document.getElementById('together-leg-badge'),
       togetherHeadline: document.getElementById('together-headline'),
       togetherSubtext: document.getElementById('together-subtext'),
-      togetherProgressLabel: document.getElementById('together-progress-label'),
       togetherProgressDay: document.getElementById('together-progress-day'),
       togetherProgressFill: document.getElementById('together-progress-fill'),
 
@@ -228,82 +160,64 @@ export class CountdownBoardApp {
       timelineUpcomingTrack: document.getElementById('timeline-upcoming-track'),
       addTimelineItemBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('add-timeline-item-btn')),
 
-      daysModalBackdrop: document.getElementById('days-modal-backdrop'),
-      daysBreakdownModal: document.getElementById('days-breakdown-modal'),
-      daysModalCloseBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('days-modal-close-btn')),
-      daysModalDoneBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('days-modal-done-btn')),
-      daysModalTotalPill: document.getElementById('days-modal-total-pill'),
-      daysModalList: document.getElementById('days-modal-list'),
-
-      fabEditBtn: document.getElementById('fab-edit-btn'),
-      editSheetBackdrop: document.getElementById('edit-sheet-backdrop'),
-      editBottomSheet: document.getElementById('edit-bottom-sheet'),
-      sheetHandleWrapper: document.getElementById('sheet-handle-wrapper'),
-      sheetHeader: document.getElementById('sheet-header'),
-      editSheetCloseBtn: document.getElementById('edit-sheet-close-btn'),
-
-      statusUpdateForm: document.getElementById('status-update-form'),
-      syncStatusPill: document.getElementById('sync-status-pill'),
-      segBtnPrimary: /** @type {HTMLButtonElement | null} */ (document.getElementById('seg-btn-primary')),
-      segBtnSecondary: /** @type {HTMLButtonElement | null} */ (document.getElementById('seg-btn-secondary')),
-      editCurrentCountryLabel: document.getElementById('edit-current-country-label'),
-      editCurrentCountry: /** @type {HTMLSelectElement | null} */ (document.getElementById('edit-current-country')),
-      editCurrentNoteLabel: document.getElementById('edit-current-note-label'),
-      editCurrentNote: /** @type {HTMLInputElement | null} */ (document.getElementById('edit-current-note')),
-      clearStatusOverridesBtn: document.getElementById('clear-status-overrides-btn'),
-
-      timelineSheetBackdrop: document.getElementById('timeline-sheet-backdrop'),
-      timelineItemSheet: document.getElementById('timeline-item-sheet'),
-      timelineSheetHandleWrapper: document.getElementById('timeline-sheet-handle-wrapper'),
-      timelineSheetHeader: document.getElementById('timeline-sheet-header'),
-      timelineSheetTitle: document.getElementById('timeline-sheet-title'),
-      timelineSheetCloseBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('timeline-sheet-close-btn')),
-      timelineItemForm: /** @type {HTMLFormElement | null} */ (document.getElementById('timeline-item-form')),
-      timelineTypeToggleGroup: document.getElementById('timeline-type-toggle-group'),
-      timelineTypeMilestoneBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('timeline-type-milestone-btn')),
-      timelineTypeChapterBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('timeline-type-chapter-btn')),
-      tlItemIdInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-item-id-input')),
-      timelineMilestoneFields: document.getElementById('timeline-milestone-fields'),
-      tlTitleInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-title-input')),
-      tlDateInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-date-input')),
-      tlPersonSelect: /** @type {HTMLSelectElement | null} */ (document.getElementById('tl-person-select')),
-      tlCountrySelect: /** @type {HTMLSelectElement | null} */ (document.getElementById('tl-country-select')),
-      tlDetailsInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-details-input')),
-      timelineChapterFields: document.getElementById('timeline-chapter-fields'),
-      tlChapterTitleInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-chapter-title-input')),
-      tlChapterEmojiInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-chapter-emoji-input')),
-      tlChapterLegsList: document.getElementById('tl-chapter-legs-list'),
-      tlAddLegBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('tl-add-leg-btn')),
-      tlChapterDescInput: /** @type {HTMLInputElement | null} */ (document.getElementById('tl-chapter-desc-input')),
-      tlSaveBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('tl-save-btn')),
-      tlDeleteBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('tl-delete-btn')),
-
-      eventModalBackdrop: document.getElementById('event-modal-backdrop'),
-      eventModal: document.getElementById('event-modal'),
-      eventModalBadge: document.getElementById('event-modal-badge'),
-      eventModalCloseBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('event-modal-close-btn')),
-      eventModalStatusPill: document.getElementById('event-modal-status-pill'),
-      eventModalDatePill: document.getElementById('event-modal-date-pill'),
-      eventModalTitle: document.getElementById('event-modal-title'),
-      eventModalTravelTag: document.getElementById('event-modal-travel-tag'),
-      eventModalLocation: document.getElementById('event-modal-location'),
-      eventCdDays: document.getElementById('event-cd-days'),
-      eventCdHours: document.getElementById('event-cd-hours'),
-      eventCdMinutes: document.getElementById('event-cd-minutes'),
-      eventCdSeconds: document.getElementById('event-cd-seconds'),
-      eventModalSubtext: document.getElementById('event-modal-subtext'),
-      eventModalEditBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('event-modal-edit-btn')),
-      eventModalDoneBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById('event-modal-done-btn')),
-
       lockDeviceBtn: document.getElementById('lock-device-btn')
     };
+  }
+
+  initSubControllers() {
+    this.photoStack = new PhotoStackController({
+      container: this.dom.photoStackContainer,
+      ambientContainer: this.dom.ambientStage,
+      deferInitialRender: true
+    });
+
+    this.daysBreakdownModal = new DaysBreakdownModal();
+
+    this.eventCountdownModal = new EventCountdownModal({
+      onEdit: (timelineEntry) => this.timelineEditorSheet.open(timelineEntry)
+    });
+
+    this.timelineEditorSheet = new TimelineEditorSheet({
+      onSave: (savePayload) => this.persistLiveState(applyTimelineSaveToLiveState(this.liveState, savePayload)),
+      onDelete: (deletePayload) => this.persistLiveState(applyTimelineDeleteToLiveState(this.liveState, deletePayload))
+    });
+
+    this.timelineRenderer = new TimelineRenderer({
+      statsPillEl: this.dom.tripStatsPill,
+      pastToggleBtn: this.dom.pastChaptersToggle,
+      pastDrawerEl: this.dom.pastChaptersDrawer,
+      upcomingTrackEl: this.dom.timelineUpcomingTrack,
+      onEditItem: (timelineEntry) => this.eventCountdownModal.open(timelineEntry, this.latestBoardState),
+      onDeleteItem: (timelineEntry) => this.timelineEditorSheet.deleteItem(timelineEntry),
+      onEditLeg: (reunion, legIndex) => this.timelineEditorSheet.open(reunion, legIndex),
+      onOpenDaysBreakdown: () => this.daysBreakdownModal.open(this.latestBoardState)
+    });
+
+    this.previewBanner = new PreviewBannerController({
+      onPreviewChange: () => this.tick(true)
+    });
+
+    this.statusEditSheet = new StatusEditSheet({
+      onSaveStatus: (overridePayload) => {
+        const updatedAt = new Date(this.getEffectiveNowMs()).toISOString();
+        return this.persistLiveState(applyStatusOverrideToLiveState(this.liveState, { ...overridePayload, updatedAt }));
+      },
+      onClearStatus: async (clearPayload) => {
+        await this.persistLiveState(clearStatusOverrideInLiveState(this.liveState, clearPayload));
+        if (this.latestBoardState) {
+          this.statusEditSheet.syncForm(this.latestBoardState);
+        }
+      },
+      onLockDevice: () => {
+        void this.lockAndPurgeBoard();
+      }
+    });
   }
 
   async init() {
     this.bindEventListeners();
     this.registerServiceWorker();
 
-    // Halt all countdown ticks and DOM hydration until either IndexedDB cache restores or user unlocks
     const cachedVault = await loadCachedVault();
     if (cachedVault && cachedVault.tripConfig) {
       await this.mountUnlockedVault(cachedVault);
@@ -317,8 +231,11 @@ export class CountdownBoardApp {
         repoConfig: this.githubRepo,
         cryptoKey: this.#vaultCryptoKey
       }),
-      (outcome) => {
-        this.updateSyncBadge(outcome.syncedRemotely ? 'synced' : 'pending', outcome.message);
+      (syncOutcome) => {
+        this.statusEditSheet.updateSyncBadge(
+          syncOutcome.syncedRemotely ? 'synced' : 'pending',
+          syncOutcome.message
+        );
       }
     );
   }
@@ -330,26 +247,19 @@ export class CountdownBoardApp {
         this.encryptedVaultJson = await response.json();
       }
     } catch {
-      // Offline or vault not yet generated
+      // Offline or vault ungenerated
     }
   }
 
-  /**
-   * Mounts the decrypted vault into volatile memory, hydrates the DOM skeleton,
-   * loads encrypted live-state overrides, and starts the 1Hz countdown loop.
-   * @param {import('./config.js').VaultPayload} payload
-   */
-  async mountUnlockedVault(payload) {
-    if (!payload || !payload.tripConfig) {
+  async mountUnlockedVault(decryptedVaultPayload) {
+    if (!decryptedVaultPayload || !decryptedVaultPayload.tripConfig) {
       throw new Error('Decrypted vault is missing required tripConfig.');
     }
 
-    this.#tripConfig = payload.tripConfig;
-    this.#githubToken = payload.githubToken ?? null;
-    this.#vaultCryptoKey = getVaultCryptoKey(payload);
-    this.githubRepo = payload.githubRepo ?? null;
-
-    // Release raw encrypted envelope buffer from RAM once unlocked
+    this.#tripConfig = decryptedVaultPayload.tripConfig;
+    this.#githubToken = decryptedVaultPayload.githubToken ?? null;
+    this.#vaultCryptoKey = getVaultCryptoKey(decryptedVaultPayload);
+    this.githubRepo = decryptedVaultPayload.githubRepo ?? null;
     this.encryptedVaultJson = null;
 
     const { firstPartnerKey, secondPartnerKey } = resolvePartnerConfigMeta(this.#tripConfig);
@@ -357,57 +267,25 @@ export class CountdownBoardApp {
     const secondaryName = this.#tripConfig.coupleNames?.[secondPartnerKey] || secondPartnerKey;
 
     if (typeof document !== 'undefined') {
-      document.title = `${ secondaryName } & ${ primaryName } — Countdown & Journey Board`;
+      document.title = `${secondaryName} & ${primaryName} — Countdown & Journey Board`;
     }
 
-    if (this.dom.primaryNameLabel) this.dom.primaryNameLabel.textContent = primaryName;
-    if (this.dom.secondaryNameLabel) this.dom.secondaryNameLabel.textContent = secondaryName;
-    if (this.dom.segBtnPrimary) this.dom.segBtnPrimary.textContent = primaryName;
-    if (this.dom.segBtnSecondary) this.dom.segBtnSecondary.textContent = secondaryName;
-
-    try {
-      const savedProfile = localStorage?.getItem('trip_preferred_profile');
-      if (savedProfile === 'secondary' || savedProfile === 'primary') {
-        this.activeProfile = savedProfile;
-      }
-    } catch {
-      // Ignore storage errors in restricted contexts
-    }
-    this.updateProfileSelectorUI();
-
-    if (this.dom.tlPersonSelect) {
-      this.dom.tlPersonSelect.innerHTML = '';
-      const bothOpt = document.createElement('option');
-      bothOpt.value = 'both';
-      bothOpt.textContent = '💕 Together';
-      const primaryOpt = document.createElement('option');
-      primaryOpt.value = firstPartnerKey;
-      primaryOpt.textContent = `🌸 ${primaryName}`;
-      const secondaryOpt = document.createElement('option');
-      secondaryOpt.value = secondPartnerKey;
-      secondaryOpt.textContent = `🌊 ${secondaryName}`;
-      this.dom.tlPersonSelect.append(bothOpt, primaryOpt, secondaryOpt);
-    }
-
-    const pinnedCodes = Array.isArray(this.#tripConfig.pinnedCountryCodes) &&
-      this.#tripConfig.pinnedCountryCodes.length > 0
-      ? this.#tripConfig.pinnedCountryCodes
-      : PINNED_COUNTRY_CODES;
-    const homeCode = this.#tripConfig.homeCountryCode || 'US';
-
-    populateCountrySelect(this.dom.editCurrentCountry, homeCode, pinnedCodes);
-    populateCountrySelect(this.dom.tlCountrySelect, pinnedCodes[2] || homeCode, pinnedCodes);
+    this.previewBanner.setTripConfig(this.#tripConfig);
+    this.statusEditSheet.mount(this.#tripConfig, {
+      primaryName,
+      secondaryName,
+      firstPartnerKey,
+      secondPartnerKey
+    });
+    this.timelineEditorSheet.mount(this.#tripConfig);
 
     if (this.dom.boardContainer) this.dom.boardContainer.hidden = false;
     if (this.dom.bottomNav) this.dom.bottomNav.hidden = false;
-    if (this.dom.fabEditBtn) this.dom.fabEditBtn.hidden = false;
-    if (this.dom.editBottomSheet) this.dom.editBottomSheet.hidden = false;
-    if (this.dom.timelineItemSheet) this.dom.timelineItemSheet.hidden = false;
     this.dom.vaultOverlay?.classList.add('is-unlocked');
     this.switchView('countdown');
 
-    if (Array.isArray(payload.photos) && payload.photos.length > 0) {
-      this.photoStack.setPhotos(payload.photos);
+    if (Array.isArray(decryptedVaultPayload.photos) && decryptedVaultPayload.photos.length > 0) {
+      this.photoStack.setPhotos(decryptedVaultPayload.photos);
     }
 
     const loadedLive = await loadLiveState(
@@ -424,15 +302,27 @@ export class CountdownBoardApp {
       customReunions: Array.isArray(loadedLive?.customReunions) ? loadedLive.customReunions : [],
       chapterOverrides: loadedLive?.chapterOverrides || {}
     };
-    this.syncEditFormWithState();
+
     this.tick(true);
     this.startTickLoop();
   }
 
-  /**
-   * Locks the board, purges IndexedDB and localStorage caches, wipes volatile credentials,
-   * and empties all DOM nodes back to the unauthenticated skeleton.
-   */
+  async persistLiveState(nextLiveState) {
+    this.liveState = nextLiveState;
+    this.tick(true);
+    this.statusEditSheet.updateSyncBadge('pending', 'Saving…');
+    const syncOutcome = await saveLiveState(
+      this.liveState,
+      this.#githubToken,
+      this.githubRepo,
+      this.#vaultCryptoKey
+    );
+    this.statusEditSheet.updateSyncBadge(
+      syncOutcome.syncedRemotely ? 'synced' : 'pending',
+      syncOutcome.message || 'Successfully updated'
+    );
+  }
+
   async lockAndPurgeBoard() {
     this.stopTickLoop();
     this.#githubToken = null;
@@ -441,6 +331,7 @@ export class CountdownBoardApp {
     this.githubRepo = null;
     this.lastTimelineSignature = '';
     this.lastSoonerMilestoneSignature = '';
+    this.latestBoardState = null;
     this.liveState = {
       schemaVersion: 1,
       updatedAt: '1970-01-01T00:00:00.000Z',
@@ -454,9 +345,11 @@ export class CountdownBoardApp {
     await clearCachedVault();
     clearLocalLiveState();
 
-    this.closeEditSheet();
-    this.closeTimelineItemEditor();
-    this.closeEventModal();
+    this.statusEditSheet.close();
+    this.timelineEditorSheet.close();
+    this.eventCountdownModal.close();
+    this.daysBreakdownModal.close();
+    this.previewBanner.reset();
     this.photoStack.clear();
     this.timelineRenderer.clear();
 
@@ -488,15 +381,10 @@ export class CountdownBoardApp {
       this.dom.secondaryCountry,
       this.dom.secondaryCityNote,
       this.dom.secondaryClock,
-      this.dom.secondaryTzOffset,
-      this.dom.eventModalTitle,
-      this.dom.eventModalTravelTag,
-      this.dom.eventModalLocation,
-      this.dom.eventModalSubtext,
-      this.dom.eventModalDatePill
+      this.dom.secondaryTzOffset
     ];
-    for (const el of textElementsToClear) {
-      if (el) el.textContent = '';
+    for (const textElement of textElementsToClear) {
+      if (textElement) textElement.textContent = '';
     }
 
     if (this.dom.cdDays) this.dom.cdDays.textContent = '--';
@@ -504,18 +392,9 @@ export class CountdownBoardApp {
     if (this.dom.cdMinutes) this.dom.cdMinutes.textContent = '--';
     if (this.dom.cdSeconds) this.dom.cdSeconds.textContent = '--';
 
-    if (this.dom.editCurrentCountry) this.dom.editCurrentCountry.innerHTML = '';
-    if (this.dom.tlCountrySelect) this.dom.tlCountrySelect.innerHTML = '';
-    if (this.dom.tlChapterLegsList) this.dom.tlChapterLegsList.innerHTML = '';
-    if (this.dom.tlPersonSelect) this.dom.tlPersonSelect.innerHTML = '';
-
     if (this.dom.boardContainer) this.dom.boardContainer.hidden = true;
     if (this.dom.bottomNav) this.dom.bottomNav.hidden = true;
-    if (this.dom.fabEditBtn) this.dom.fabEditBtn.hidden = true;
-    if (this.dom.editBottomSheet) this.dom.editBottomSheet.hidden = true;
-    if (this.dom.timelineItemSheet) this.dom.timelineItemSheet.hidden = true;
     if (this.dom.subMilestoneBanner) this.dom.subMilestoneBanner.hidden = true;
-    this.closeDaysBreakdownModal();
 
     this.switchView('countdown');
 
@@ -539,14 +418,17 @@ export class CountdownBoardApp {
     }
   }
 
-  bindEventListeners() {
-    // 1. Password Vault Unlock Form
-    this.dom.vaultForm?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const password = this.dom.vaultPasswordInput?.value ?? '';
-      const remember = Boolean(this.dom.vaultRememberCheckbox?.checked);
+  getEffectiveNowMs() {
+    return this.previewBanner?.getPreviewTimestamp() ?? Date.now();
+  }
 
-      if (!password) return;
+  bindEventListeners() {
+    this.dom.vaultForm?.addEventListener('submit', async (submitEvent) => {
+      submitEvent.preventDefault();
+      const enteredPassword = this.dom.vaultPasswordInput?.value ?? '';
+      const rememberKey = Boolean(this.dom.vaultRememberCheckbox?.checked);
+
+      if (!enteredPassword) return;
       if (this.dom.vaultUnlockBtn) this.dom.vaultUnlockBtn.disabled = true;
       if (this.dom.vaultErrorMsg) this.dom.vaultErrorMsg.textContent = '';
       this.dom.vaultCard?.classList.remove('is-error');
@@ -559,16 +441,16 @@ export class CountdownBoardApp {
           throw new Error('Could not load vault.json');
         }
 
-        const decrypted = await unlockAndCacheVault(this.encryptedVaultJson, password, remember);
+        const decryptedPayload = await unlockAndCacheVault(this.encryptedVaultJson, enteredPassword, rememberKey);
         if (this.dom.vaultPasswordInput) this.dom.vaultPasswordInput.value = '';
-        await this.mountUnlockedVault(decrypted);
-      } catch (err) {
+        await this.mountUnlockedVault(decryptedPayload);
+      } catch (unlockError) {
         if (this.dom.vaultErrorMsg) {
-          const message =
-            err instanceof Error && err.message.includes('tripConfig')
+          const errorMessage =
+            unlockError instanceof Error && unlockError.message.includes('tripConfig')
               ? 'Vault schema outdated — re-run scripts/encrypt-vault.mjs with your password.'
               : 'Incorrect password — please try again.';
-          this.dom.vaultErrorMsg.textContent = message;
+          this.dom.vaultErrorMsg.textContent = errorMessage;
         }
         this.dom.vaultCard?.classList.remove('is-error');
         void this.dom.vaultCard?.offsetWidth;
@@ -578,7 +460,6 @@ export class CountdownBoardApp {
       }
     });
 
-    // 2. Bottom Nav View Switcher
     this.dom.navBtnCountdown?.addEventListener('click', () => {
       this.switchView('countdown');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -588,303 +469,41 @@ export class CountdownBoardApp {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
-    // 3. Bottom Sheet Open / Close
-    this.dom.fabEditBtn?.addEventListener('click', () => this.openEditSheet());
-    this.dom.editSheetCloseBtn?.addEventListener('click', () => this.closeEditSheet());
-    this.dom.editSheetBackdrop?.addEventListener('click', () => this.closeEditSheet());
-
-    // 4. Timeline Item Editor Open / Close
-    this.dom.addTimelineItemBtn?.addEventListener('click', () => this.openTimelineItemEditor(null));
-    this.dom.timelineSheetCloseBtn?.addEventListener('click', () => this.closeTimelineItemEditor());
-    this.dom.timelineSheetBackdrop?.addEventListener('click', () => this.closeTimelineItemEditor());
-
-    // 5. Event Countdown Popup Modal Open / Close
-    this.dom.eventModalCloseBtn?.addEventListener('click', () => this.closeEventModal());
-    this.dom.eventModalDoneBtn?.addEventListener('click', () => this.closeEventModal());
-    this.dom.eventModalBackdrop?.addEventListener('click', () => this.closeEventModal());
-    this.dom.eventModalEditBtn?.addEventListener('click', () => {
-      const item = this.#activeEventModalItem;
-      this.closeEventModal();
-      if (item) this.openTimelineItemEditor(item);
+    this.dom.addTimelineItemBtn?.addEventListener('click', () => {
+      this.timelineEditorSheet.open(null);
     });
 
-    // 6. Days Together Country Breakdown Modal Close
-    this.dom.daysModalCloseBtn?.addEventListener('click', () => this.closeDaysBreakdownModal());
-    this.dom.daysModalDoneBtn?.addEventListener('click', () => this.closeDaysBreakdownModal());
-    this.dom.daysModalBackdrop?.addEventListener('click', () => this.closeDaysBreakdownModal());
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        if (this.dom.daysBreakdownModal && !this.dom.daysBreakdownModal.hidden) {
-          this.closeDaysBreakdownModal();
-        } else if (this.#activeEventModalItem) {
-          this.closeEventModal();
-        } else if (this.dom.timelineItemSheet && !this.dom.timelineItemSheet.hidden) {
-          this.closeTimelineItemEditor();
-        } else if (this.dom.editBottomSheet && !this.dom.editBottomSheet.hidden) {
-          this.closeEditSheet();
-        }
-      }
-    });
-
-    // Touch drag-down gestures for both sheets
-    this.bindSheetDragGestures(
-      this.dom.editBottomSheet,
-      this.dom.sheetHandleWrapper || this.dom.sheetHeader,
-      () => this.closeEditSheet()
-    );
-    this.bindSheetDragGestures(
-      this.dom.timelineItemSheet,
-      this.dom.timelineSheetHandleWrapper || this.dom.timelineSheetHeader,
-      () => this.closeTimelineItemEditor()
-    );
-
-    // 4. Profile Selector Buttons in Quick Status Update
-    this.dom.segBtnPrimary?.addEventListener('click', () => {
-      this.activeProfile = 'primary';
-      try { localStorage?.setItem('trip_preferred_profile', 'primary'); } catch {}
-      this.updateProfileSelectorUI();
-      this.syncEditFormWithState();
-    });
-    this.dom.segBtnSecondary?.addEventListener('click', () => {
-      this.activeProfile = 'secondary';
-      try { localStorage?.setItem('trip_preferred_profile', 'secondary'); } catch {}
-      this.updateProfileSelectorUI();
-      this.syncEditFormWithState();
-    });
-
-    // 5. Quick Status Update Form (focused on activeProfile)
-    this.dom.statusUpdateForm?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      if (!this.#tripConfig) return;
-
-      const { firstPartnerKey, secondPartnerKey } = resolvePartnerConfigMeta(this.#tripConfig);
-      const targetPartnerKey = this.activeProfile === 'secondary' ? secondPartnerKey : firstPartnerKey;
-      const homeCode = this.#tripConfig.homeCountryCode || 'US';
-      const nowIso = new Date(this.getEffectiveNowMs()).toISOString();
-      const countryCode = this.dom.editCurrentCountry?.value || homeCode;
-      const cityNote = (this.dom.editCurrentNote?.value || '').trim();
-
-      const existingOverrides = this.liveState.statusOverrides || {};
-      this.liveState = {
-        ...this.liveState,
-        statusOverrides: {
-          ...existingOverrides,
-          [targetPartnerKey]: {
-            countryCode,
-            cityNote,
-            updatedAt: nowIso
-          }
-        }
-      };
-
-      this.tick(true);
-      this.updateSyncBadge('pending', 'Saving…');
-      const result = await saveLiveState(
-        this.liveState,
-        this.#githubToken,
-        this.githubRepo,
-        this.#vaultCryptoKey
-      );
-      this.updateSyncBadge(result.syncedRemotely ? 'synced' : 'pending', result.message);
-    });
-
-    // 6. Clear Manual Status Overrides (Reset to Auto Schedule for active profile)
-    this.dom.clearStatusOverridesBtn?.addEventListener('click', async () => {
-      if (!this.#tripConfig) return;
-      const { firstPartnerKey, secondPartnerKey } = resolvePartnerConfigMeta(this.#tripConfig);
-      const targetPartnerKey = this.activeProfile === 'secondary' ? secondPartnerKey : firstPartnerKey;
-      const updatedOverrides = { ...(this.liveState.statusOverrides || {}) };
-      delete updatedOverrides[targetPartnerKey];
-
-      this.liveState = {
-        ...this.liveState,
-        statusOverrides: updatedOverrides
-      };
-      this.tick(true);
-      this.syncEditFormWithState();
-      const result = await saveLiveState(
-        this.liveState,
-        this.#githubToken,
-        this.githubRepo,
-        this.#vaultCryptoKey
-      );
-      this.updateSyncBadge(result.syncedRemotely ? 'synced' : 'pending', 'Successfully updated');
-    });
-
-    // 8. Segmented Toggle in Timeline Item Editor
-    this.dom.timelineTypeMilestoneBtn?.addEventListener('click', () => {
-      this.setTimelineEditorMode('milestone');
-    });
-    this.dom.timelineTypeChapterBtn?.addEventListener('click', () => {
-      this.setTimelineEditorMode('chapter');
-    });
-    this.dom.tlAddLegBtn?.addEventListener('click', () => {
-      this.appendChapterLegRow();
-    });
-
-    // 9. Timeline Item Form Submit (Milestone or Chapter)
-    this.dom.timelineItemForm?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      if (!this.#tripConfig) return;
-
-      const id = (this.dom.tlItemIdInput?.value || '').trim();
-
-      if (this.timelineEditorMode === 'chapter') {
-        const rawTitle = (this.dom.tlChapterTitleInput?.value || '').trim();
-        const emoji = (this.dom.tlChapterEmojiInput?.value || '').trim() || '✈️';
-        const description = (this.dom.tlChapterDescInput?.value || '').trim();
-        const collectedLegs = this.collectChapterLegsFromDom()
-          .filter((leg) => leg.startDate && leg.endDate)
-          .map((leg) => ({
-            ...leg,
-            endDate: leg.endDate < leg.startDate ? leg.startDate : leg.endDate
-          }));
-
-        if (collectedLegs.length === 0) return;
-
-        const startDate = collectedLegs[0].startDate;
-        const endDate = collectedLegs[collectedLegs.length - 1].endDate;
-        const firstCountry = getCountryInfo(collectedLegs[0].countryCode);
-        const defaultTitle = collectedLegs.length > 1
-          ? `Together Across ${collectedLegs.length} Countries`
-          : `${collectedLegs[0].label || firstCountry.name} Reunion`;
-        const title = rawTitle || defaultTitle;
-
-        if (!id) {
-          const newId = `custom-ch-${Date.now()}`;
-          const newChapter = {
-            id: newId,
-            title,
-            emoji,
-            startDate,
-            endDate,
-            description,
-            legs: collectedLegs.map((leg, idx) => ({
-              ...leg,
-              id: leg.id || `${newId}-leg-${idx + 1}`
-            }))
-          };
-          this.liveState = {
-            ...this.liveState,
-            customReunions: [...(this.liveState.customReunions || []), newChapter]
-          };
-        } else {
-          const customIdx = (this.liveState.customReunions || []).findIndex((r) => r.id === id);
-          if (customIdx >= 0) {
-            const existing = this.liveState.customReunions[customIdx];
-            const updated = [...this.liveState.customReunions];
-            updated[customIdx] = {
-              ...existing,
-              title,
-              emoji,
-              startDate,
-              endDate,
-              description,
-              legs: collectedLegs
-            };
-            this.liveState = { ...this.liveState, customReunions: updated };
-          } else {
-            this.liveState = {
-              ...this.liveState,
-              chapterOverrides: {
-                ...(this.liveState.chapterOverrides || {}),
-                [id]: {
-                  title,
-                  emoji,
-                  startDate,
-                  endDate,
-                  legs: collectedLegs,
-                  description,
-                  hidden: false
-                }
-              }
-            };
-          }
-        }
-      } else {
-        const title = (this.dom.tlTitleInput?.value || '').trim();
-        const date = this.dom.tlDateInput?.value || '';
-        const person = this.dom.tlPersonSelect?.value || 'both';
-        const countryCode = this.dom.tlCountrySelect?.value || this.#tripConfig.homeCountryCode || 'US';
-        const details = (this.dom.tlDetailsInput?.value || '').trim();
-
-        if (!title || !date) return;
-
-        if (!id) {
-          const newId = `custom-ms-${Date.now()}`;
-          const newMilestone = {
-            id: newId,
-            date,
-            category: /** @type {const} */ ('custom'),
-            emoji: person === 'both' ? '💖' : '📍',
-            title,
-            details,
-            person,
-            countryCode
-          };
-          this.liveState = {
-            ...this.liveState,
-            customMilestones: [...(this.liveState.customMilestones || []), newMilestone]
-          };
-        } else {
-          const customIdx = (this.liveState.customMilestones || []).findIndex((m) => m.id === id);
-          if (customIdx >= 0) {
-            const updated = [...this.liveState.customMilestones];
-            updated[customIdx] = {
-              ...updated[customIdx],
-              title,
-              date,
-              person,
-              countryCode,
-              details
-            };
-            this.liveState = { ...this.liveState, customMilestones: updated };
-          } else {
-            this.liveState = {
-              ...this.liveState,
-              milestoneOverrides: {
-                ...(this.liveState.milestoneOverrides || {}),
-                [id]: {
-                  title,
-                  date,
-                  person,
-                  countryCode,
-                  details,
-                  hidden: false
-                }
-              }
-            };
-          }
-        }
-      }
-
-      this.closeTimelineItemEditor();
-      this.tick(true);
-      this.updateSyncBadge('pending', 'Saving…');
-      const result = await saveLiveState(
-        this.liveState,
-        this.#githubToken,
-        this.githubRepo,
-        this.#vaultCryptoKey
-      );
-      this.updateSyncBadge(result.syncedRemotely ? 'synced' : 'pending', 'Successfully updated');
-    });
-
-    // 10. Delete Timeline Item from Editor Sheet
-    this.dom.tlDeleteBtn?.addEventListener('click', async () => {
-      const id = (this.dom.tlItemIdInput?.value || '').trim();
-      if (!id || !this.#tripConfig) return;
-      this.closeTimelineItemEditor();
-      await this.deleteTimelineItem({ id, isChapter: this.timelineEditorMode === 'chapter' });
-    });
-
-    // 8. Lock Device Button
     this.dom.lockDeviceBtn?.addEventListener('click', () => {
       void this.lockAndPurgeBoard();
     });
 
-    // 9. Resume tick immediately when tab becomes visible
+    window.addEventListener('keydown', (keyboardEvent) => {
+      if (keyboardEvent.key === 'Escape') {
+        if (this.daysBreakdownModal.isOpen()) {
+          this.daysBreakdownModal.close();
+        } else if (this.eventCountdownModal.isOpen()) {
+          this.eventCountdownModal.close();
+        } else if (this.timelineEditorSheet.isOpen()) {
+          this.timelineEditorSheet.close();
+        } else if (this.statusEditSheet.isOpen()) {
+          this.statusEditSheet.close();
+        }
+      } else if (keyboardEvent.key === 'p' || keyboardEvent.key === 'P') {
+        if (!this.#tripConfig) return;
+        const activePreviewTimestamp = this.previewBanner.getPreviewTimestamp();
+        if (activePreviewTimestamp !== null) {
+          this.previewBanner.reset();
+        } else {
+          this.previewBanner.stepDays(1);
+        }
+      } else if (keyboardEvent.key === 'ArrowRight' || keyboardEvent.key === 'ArrowLeft') {
+        if (!this.#tripConfig) return;
+        if (this.previewBanner.getPreviewTimestamp() !== null) {
+          this.previewBanner.stepDays(keyboardEvent.key === 'ArrowRight' ? 1 : -1);
+        }
+      }
+    });
+
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden && this.#tripConfig) {
@@ -894,95 +513,18 @@ export class CountdownBoardApp {
     }
   }
 
-  /**
-   * Binds touch drag-down gesture on a sheet handle, header, and top of the scrollable sheet.
-   * @param {HTMLElement | null} sheet
-   * @param {HTMLElement | null} dragTarget
-   * @param {() => void} onClose
-   */
-  bindSheetDragGestures(sheet, dragTarget, onClose) {
-    if (!sheet) return;
-
-    let touchStartY = 0;
-    let currentDeltaY = 0;
-    let isTrackingTouch = false;
-
-    const onTouchStart = (/** @type {TouchEvent} */ e) => {
-      if (!sheet.classList.contains('is-open')) return;
-      touchStartY = e.touches[0].clientY;
-      currentDeltaY = 0;
-      isTrackingTouch = true;
-      sheet.style.transition = 'none';
-    };
-
-    const onTouchMove = (/** @type {TouchEvent} */ e) => {
-      if (!isTrackingTouch) return;
-      const deltaY = e.touches[0].clientY - touchStartY;
-      if (deltaY > 0) {
-        currentDeltaY = deltaY;
-        sheet.style.transform = `translateY(${deltaY}px)`;
-        if (e.cancelable) e.preventDefault();
-      }
-    };
-
-    const onTouchEnd = () => {
-      if (!isTrackingTouch) return;
-      isTrackingTouch = false;
-      sheet.style.transition = '';
-      if (currentDeltaY > 80) {
-        onClose();
-      } else {
-        sheet.style.transform = '';
-      }
-      currentDeltaY = 0;
-    };
-
-    dragTarget?.addEventListener('touchstart', onTouchStart, { passive: true });
-    dragTarget?.addEventListener('touchmove', onTouchMove, { passive: false });
-    dragTarget?.addEventListener('touchend', onTouchEnd, { passive: true });
-    dragTarget?.addEventListener('touchcancel', onTouchEnd, { passive: true });
-
-    // Also support drag-down directly inside sheet when scrolled to top
-    sheet.addEventListener('touchstart', (e) => {
-      if (sheet.scrollTop <= 0) {
-        touchStartY = e.touches[0].clientY;
-      }
-    }, { passive: true });
-
-    sheet.addEventListener('touchmove', (e) => {
-      if (sheet.scrollTop <= 0) {
-        const delta = e.touches[0].clientY - touchStartY;
-        if (delta > 0 && !isTrackingTouch) {
-          isTrackingTouch = true;
-          sheet.style.transition = 'none';
-        }
-        if (isTrackingTouch) {
-          currentDeltaY = delta;
-          sheet.style.transform = `translateY(${delta}px)`;
-          if (e.cancelable) e.preventDefault();
-        }
-      }
-    }, { passive: false });
-
-    sheet.addEventListener('touchend', onTouchEnd, { passive: true });
-  }
-
-  /**
-   * Switches the active top-level view tab between 'countdown' and 'timeline'.
-   * @param {'countdown' | 'timeline'} viewName
-   */
   switchView(viewName) {
     const previousView = this.activeView;
     this.activeView = viewName;
     if (this.dom.bottomNav) {
       this.dom.bottomNav.setAttribute('data-active-view', viewName);
     }
-    const isForward = (previousView === 'countdown' && viewName === 'timeline');
-    const isBackward = (previousView === 'timeline' && viewName === 'countdown');
+    const isTransitionForward = (previousView === 'countdown' && viewName === 'timeline');
+    const isTransitionBackward = (previousView === 'timeline' && viewName === 'countdown');
 
     if (this.dom.viewCountdown) {
       this.dom.viewCountdown.hidden = viewName !== 'countdown';
-      if (viewName === 'countdown' && isBackward) {
+      if (viewName === 'countdown' && isTransitionBackward) {
         this.dom.viewCountdown.classList.remove('slide-forward', 'slide-backward');
         void this.dom.viewCountdown.offsetWidth;
         this.dom.viewCountdown.classList.add('slide-backward');
@@ -990,7 +532,7 @@ export class CountdownBoardApp {
     }
     if (this.dom.viewTimeline) {
       this.dom.viewTimeline.hidden = viewName !== 'timeline';
-      if (viewName === 'timeline' && isForward) {
+      if (viewName === 'timeline' && isTransitionForward) {
         this.dom.viewTimeline.classList.remove('slide-forward', 'slide-backward');
         void this.dom.viewTimeline.offsetWidth;
         this.dom.viewTimeline.classList.add('slide-forward');
@@ -998,736 +540,130 @@ export class CountdownBoardApp {
     }
     this.dom.navBtnCountdown?.classList.toggle('is-active', viewName === 'countdown');
     this.dom.navBtnTimeline?.classList.toggle('is-active', viewName === 'timeline');
-    if (this.dom.fabEditBtn) this.dom.fabEditBtn.hidden = viewName !== 'countdown';
+    this.statusEditSheet.setFabVisible(viewName === 'countdown');
   }
 
-  /**
-   * Toggles the timeline entry form between milestone and chapter inputs.
-   * @param {'milestone' | 'chapter'} mode
-   */
-  setTimelineEditorMode(mode) {
-    this.timelineEditorMode = mode;
-    const isMilestone = mode === 'milestone';
-    this.dom.timelineTypeMilestoneBtn?.classList.toggle('is-active', isMilestone);
-    this.dom.timelineTypeChapterBtn?.classList.toggle('is-active', !isMilestone);
-    if (this.dom.tlTitleInput) this.dom.tlTitleInput.required = isMilestone;
-    if (this.dom.tlDateInput) this.dom.tlDateInput.required = isMilestone;
-    if (this.dom.timelineMilestoneFields) {
-      this.dom.timelineMilestoneFields.hidden = !isMilestone;
-      this.dom.timelineMilestoneFields.style.display = isMilestone ? 'flex' : 'none';
-    }
-    if (this.dom.timelineChapterFields) {
-      this.dom.timelineChapterFields.hidden = isMilestone;
-      this.dom.timelineChapterFields.style.display = isMilestone ? 'none' : 'flex';
-    }
-  }
-
-  /**
-   * Returns pinned country codes from decrypted TripConfig or default fallback.
-   * @returns {string[]}
-   */
-  getPinnedCountryCodes() {
-    return Array.isArray(this.#tripConfig?.pinnedCountryCodes) &&
-      this.#tripConfig.pinnedCountryCodes.length > 0
-      ? this.#tripConfig.pinnedCountryCodes
-      : PINNED_COUNTRY_CODES;
-  }
-
-  /**
-   * Automatically updates the chapter title if it follows the "Together Across N Countries" pattern.
-   * @param {number} legCount
-   */
-  syncAutoChapterTitleWithLegCount(legCount) {
-    if (!this.dom.tlChapterTitleInput) return;
-    const currentTitle = this.dom.tlChapterTitleInput.value.trim();
-    if (/^Together Across \d+ Countr(?:y|ies)$/i.test(currentTitle)) {
-      this.dom.tlChapterTitleInput.value = legCount === 1
-        ? 'Together Across 1 Country'
-        : `Together Across ${legCount} Countries`;
-    }
-  }
-
-  /**
-   * Reads the ordered list of ReunionLeg items from the Chapter Editor DOM.
-   * @returns {import('./config.js').ReunionLeg[]}
-   */
-  collectChapterLegsFromDom() {
-    if (!this.dom.tlChapterLegsList) return [];
-    const homeCode = this.#tripConfig?.homeCountryCode || 'US';
-    const cards = Array.from(this.dom.tlChapterLegsList.querySelectorAll('.chapter-leg-editor-card'));
-    return cards.map((card, index) => {
-      const el = /** @type {HTMLElement} */ (card);
-      const legId = el.dataset.legId || `leg-${Date.now()}-${index + 1}`;
-      const selectEl = /** @type {HTMLSelectElement | null} */ (el.querySelector('.leg-country-select'));
-      const labelInput = /** @type {HTMLInputElement | null} */ (el.querySelector('.leg-label-input'));
-      const startInput = /** @type {HTMLInputElement | null} */ (el.querySelector('.leg-start-input'));
-      const endInput = /** @type {HTMLInputElement | null} */ (el.querySelector('.leg-end-input'));
-      const notesInput = /** @type {HTMLInputElement | null} */ (el.querySelector('.leg-notes-input'));
-
-      const countryCode = selectEl?.value || homeCode;
-      const label = (labelInput?.value || '').trim();
-      const startDate = startInput?.value || '';
-      const endDate = endInput?.value || startDate;
-      const notes = (notesInput?.value || '').trim();
-
-      /** @type {import('./config.js').ReunionLeg} */
-      const leg = {
-        id: legId,
-        countryCode,
-        startDate,
-        endDate
-      };
-      if (label) leg.label = label;
-      if (notes) leg.notes = notes;
-      return leg;
-    });
-  }
-
-  /**
-   * Renders the dynamic list of editable country leg cards inside `#tl-chapter-legs-list`.
-   * @param {import('./config.js').ReunionLeg[]} legs
-   * @param {number | null} [focusLegIndex=null]
-   */
-  renderChapterLegRows(legs, focusLegIndex = null) {
-    if (!this.dom.tlChapterLegsList || !this.#tripConfig) return;
-    this.dom.tlChapterLegsList.innerHTML = '';
-
-    const pinnedCodes = this.getPinnedCountryCodes();
-    const homeCode = this.#tripConfig.homeCountryCode || 'US';
-    const safeLegs = Array.isArray(legs) && legs.length > 0
-      ? legs
-      : [
-          {
-            id: `leg-${Date.now()}-1`,
-            countryCode: pinnedCodes[0] || homeCode,
-            startDate: new Date().toISOString().slice(0, 10),
-            endDate: addCalendarDays(new Date().toISOString().slice(0, 10), 7)
-          }
-        ];
-
-    safeLegs.forEach((leg, idx) => {
-      const card = document.createElement('div');
-      card.className = `chapter-leg-editor-card${focusLegIndex === idx ? ' is-focused' : ''}`;
-      card.dataset.legId = leg.id || `leg-${Date.now()}-${idx + 1}`;
-      card.dataset.legIndex = String(idx);
-
-      const header = document.createElement('div');
-      header.className = 'chapter-leg-editor-header';
-
-      const badge = document.createElement('span');
-      badge.className = 'chapter-leg-number-badge';
-      badge.textContent = `Country #${idx + 1}`;
-      header.appendChild(badge);
-
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.className = 'chapter-leg-remove-btn';
-      removeBtn.textContent = 'Remove ✕';
-      removeBtn.disabled = safeLegs.length <= 1;
-      removeBtn.title = safeLegs.length <= 1
-        ? 'A chapter requires at least one country'
-        : `Remove Country #${idx + 1}`;
-      removeBtn.setAttribute('aria-label', `Remove Country #${idx + 1}`);
-      removeBtn.addEventListener('click', () => {
-        const currentLegs = this.collectChapterLegsFromDom();
-        if (currentLegs.length <= 1) return;
-        currentLegs.splice(idx, 1);
-        this.syncAutoChapterTitleWithLegCount(currentLegs.length);
-        this.renderChapterLegRows(currentLegs);
-      });
-      header.appendChild(removeBtn);
-      card.appendChild(header);
-
-      const topGrid = document.createElement('div');
-      topGrid.className = 'status-edit-grid';
-
-      const countryGroup = document.createElement('div');
-      countryGroup.className = 'form-group';
-      const countryLabel = document.createElement('label');
-      countryLabel.className = 'form-label';
-      countryLabel.textContent = 'Country (Flag & Timezone)';
-      const countrySelect = document.createElement('select');
-      countrySelect.className = 'form-select leg-country-select';
-      const selectedCode = leg.countryCode || pinnedCodes[0] || homeCode;
-      populateCountrySelect(countrySelect, selectedCode, pinnedCodes);
-      countryGroup.append(countryLabel, countrySelect);
-
-      const nameGroup = document.createElement('div');
-      nameGroup.className = 'form-group';
-      const nameLabel = document.createElement('label');
-      nameLabel.className = 'form-label';
-      nameLabel.textContent = 'Display Name (Optional)';
-      const nameInput = document.createElement('input');
-      nameInput.type = 'text';
-      nameInput.className = 'form-input leg-label-input';
-      nameInput.setAttribute('dir', 'auto');
-      nameInput.maxLength = 60;
-      nameInput.placeholder = getCountryInfo(selectedCode).name;
-      nameInput.value = leg.label || '';
-
-      countrySelect.addEventListener('change', () => {
-        nameInput.placeholder = getCountryInfo(countrySelect.value).name;
-      });
-
-      nameGroup.append(nameLabel, nameInput);
-      topGrid.append(countryGroup, nameGroup);
-      card.appendChild(topGrid);
-
-      const datesGrid = document.createElement('div');
-      datesGrid.className = 'status-edit-grid';
-
-      const startGroup = document.createElement('div');
-      startGroup.className = 'form-group';
-      const startLabel = document.createElement('label');
-      startLabel.className = 'form-label';
-      startLabel.textContent = 'Start Date';
-      const startInput = document.createElement('input');
-      startInput.type = 'date';
-      startInput.className = 'form-input numeric-lock leg-start-input';
-      startInput.setAttribute('dir', 'ltr');
-      startInput.value = leg.startDate || '';
-      startGroup.append(startLabel, startInput);
-
-      const endGroup = document.createElement('div');
-      endGroup.className = 'form-group';
-      const endLabel = document.createElement('label');
-      endLabel.className = 'form-label';
-      endLabel.textContent = 'End Date';
-      const endInput = document.createElement('input');
-      endInput.type = 'date';
-      endInput.className = 'form-input numeric-lock leg-end-input';
-      endInput.setAttribute('dir', 'ltr');
-      endInput.value = leg.endDate || '';
-      endGroup.append(endLabel, endInput);
-
-      datesGrid.append(startGroup, endGroup);
-      card.appendChild(datesGrid);
-
-      const notesInput = document.createElement('input');
-      notesInput.type = 'hidden';
-      notesInput.className = 'leg-notes-input';
-      notesInput.value = leg.notes || '';
-      card.appendChild(notesInput);
-
-      this.dom.tlChapterLegsList?.appendChild(card);
-    });
-
-    if (focusLegIndex !== null && focusLegIndex >= 0) {
-      const targetCard = this.dom.tlChapterLegsList.querySelector(
-        `.chapter-leg-editor-card[data-leg-index="${focusLegIndex}"]`
-      );
-      if (targetCard instanceof HTMLElement) {
-        requestAnimationFrame(() => {
-          targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          const labelInput = targetCard.querySelector('.leg-label-input');
-          if (labelInput instanceof HTMLInputElement) {
-            labelInput.focus({ preventScroll: true });
-          }
-        });
-      }
-    }
-  }
-
-  /**
-   * Appends a new country leg to the Chapter Editor, defaulting its startDate to the previous leg's endDate.
-   */
-  appendChapterLegRow() {
-    if (!this.#tripConfig) return;
-    const currentLegs = this.collectChapterLegsFromDom();
-    const pinnedCodes = this.getPinnedCountryCodes();
-    const homeCode = this.#tripConfig.homeCountryCode || 'US';
-
-    const lastLeg = currentLegs[currentLegs.length - 1] ?? null;
-    const nextStartDate = lastLeg?.endDate || new Date().toISOString().slice(0, 10);
-    const nextEndDate = addCalendarDays(nextStartDate, 7);
-
-    const usedCodes = new Set(currentLegs.map((l) => l.countryCode));
-    const suggestedCode =
-      pinnedCodes.find((c) => !usedCodes.has(c) && c !== homeCode) ||
-      pinnedCodes[0] ||
-      homeCode;
-
-    currentLegs.push({
-      id: `leg-${Date.now()}-${currentLegs.length + 1}`,
-      countryCode: suggestedCode,
-      startDate: nextStartDate,
-      endDate: nextEndDate
-    });
-
-    this.syncAutoChapterTitleWithLegCount(currentLegs.length);
-    this.renderChapterLegRows(currentLegs, currentLegs.length - 1);
-  }
-
-  /**
-   * Opens the timeline editor bottom sheet, populating existing data if provided.
-   * @param {import('./config.js').MilestoneEvent | import('./config.js').ReunionChapter | null} [item]
-   * @param {number | null} [focusLegIndex=null]
-   */
-  openTimelineItemEditor(item = null, focusLegIndex = null) {
-    if (!this.#tripConfig) return;
-    if (this.dom.timelineItemSheet) this.dom.timelineItemSheet.hidden = false;
-
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const pinnedCodes = this.getPinnedCountryCodes();
-    const homeCode = this.#tripConfig.homeCountryCode || 'US';
-
-    if (item === null) {
-      if (this.dom.timelineSheetTitle) this.dom.timelineSheetTitle.textContent = 'Add Timeline Entry';
-      if (this.dom.timelineTypeToggleGroup) this.dom.timelineTypeToggleGroup.style.display = 'flex';
-      if (this.dom.tlItemIdInput) this.dom.tlItemIdInput.value = '';
-
-      if (this.dom.tlTitleInput) this.dom.tlTitleInput.value = '';
-      if (this.dom.tlDateInput) this.dom.tlDateInput.value = todayStr;
-      if (this.dom.tlPersonSelect) this.dom.tlPersonSelect.value = 'both';
-      if (this.dom.tlCountrySelect) this.dom.tlCountrySelect.value = homeCode;
-      if (this.dom.tlDetailsInput) this.dom.tlDetailsInput.value = '';
-
-      if (this.dom.tlChapterTitleInput) this.dom.tlChapterTitleInput.value = '';
-      if (this.dom.tlChapterEmojiInput) this.dom.tlChapterEmojiInput.value = '✈️';
-      if (this.dom.tlChapterDescInput) this.dom.tlChapterDescInput.value = '';
-      this.renderChapterLegRows([
-        {
-          id: `leg-${Date.now()}-1`,
-          countryCode: pinnedCodes[0] || homeCode,
-          startDate: todayStr,
-          endDate: addCalendarDays(todayStr, 7)
-        }
-      ]);
-
-      if (this.dom.tlDeleteBtn) {
-        this.dom.tlDeleteBtn.hidden = true;
-        this.dom.tlDeleteBtn.style.display = 'none';
-      }
-      this.setTimelineEditorMode('milestone');
-    } else if (isReunionChapter(item)) {
-      if (this.dom.timelineSheetTitle) this.dom.timelineSheetTitle.textContent = 'Edit Chapter & Countries';
-      if (this.dom.timelineTypeToggleGroup) this.dom.timelineTypeToggleGroup.style.display = 'none';
-      if (this.dom.tlItemIdInput) this.dom.tlItemIdInput.value = item.id;
-
-      if (this.dom.tlChapterTitleInput) this.dom.tlChapterTitleInput.value = item.title || '';
-      if (this.dom.tlChapterEmojiInput) this.dom.tlChapterEmojiInput.value = item.emoji || '✈️';
-      if (this.dom.tlChapterDescInput) this.dom.tlChapterDescInput.value = item.description || '';
-
-      if (this.dom.tlDeleteBtn) {
-        this.dom.tlDeleteBtn.hidden = false;
-        this.dom.tlDeleteBtn.style.display = 'block';
-      }
-      this.setTimelineEditorMode('chapter');
-      this.renderChapterLegRows(item.legs || [], focusLegIndex);
-    } else {
-      if (this.dom.timelineSheetTitle) this.dom.timelineSheetTitle.textContent = 'Edit Milestone';
-      if (this.dom.timelineTypeToggleGroup) this.dom.timelineTypeToggleGroup.style.display = 'none';
-      if (this.dom.tlItemIdInput) this.dom.tlItemIdInput.value = item.id;
-
-      if (this.dom.tlTitleInput) this.dom.tlTitleInput.value = item.title || '';
-      if (this.dom.tlDateInput) this.dom.tlDateInput.value = item.date || '';
-      if (this.dom.tlPersonSelect) this.dom.tlPersonSelect.value = item.person || 'both';
-      if (this.dom.tlCountrySelect) this.dom.tlCountrySelect.value = item.countryCode || homeCode;
-      if (this.dom.tlDetailsInput) this.dom.tlDetailsInput.value = item.details || '';
-
-      if (this.dom.tlDeleteBtn) {
-        this.dom.tlDeleteBtn.hidden = false;
-        this.dom.tlDeleteBtn.style.display = 'block';
-      }
-      this.setTimelineEditorMode('milestone');
-    }
-
-    this.dom.timelineSheetBackdrop?.classList.add('is-open');
-    this.dom.timelineItemSheet?.classList.add('is-open');
-  }
-
-  closeTimelineItemEditor() {
-    this.dom.timelineSheetBackdrop?.classList.remove('is-open');
-    this.dom.timelineItemSheet?.classList.remove('is-open');
-    if (this.dom.timelineItemSheet) {
-      this.dom.timelineItemSheet.style.transform = '';
-      this.dom.timelineItemSheet.style.transition = '';
-    }
-  }
-
-  openDaysBreakdownModal() {
-    if (!this.#tripConfig) return;
-    if (this.dom.daysModalBackdrop) this.dom.daysModalBackdrop.hidden = false;
-    if (this.dom.daysBreakdownModal) this.dom.daysBreakdownModal.hidden = false;
-
-    const state = this.latestBoardState ?? evaluateBoardState(this.#tripConfig, this.liveState, this.getEffectiveNowMs());
-    const breakdown = state.timeline.countryDaysBreakdown || [];
-    const plannedDays = state.timeline.plannedTripDaysTogether ?? 0;
-
-    if (this.dom.daysModalTotalPill) {
-      this.dom.daysModalTotalPill.textContent = `${plannedDays} Days Total`;
-    }
-    if (this.dom.daysModalList) {
-      this.dom.daysModalList.innerHTML = breakdown.map((item) => `
-        <div class="days-breakdown-item">
-          <div class="days-breakdown-country">
-            <span class="days-breakdown-flag">${item.flag}</span>
-            <span class="days-breakdown-name">${item.countryName}</span>
-          </div>
-          <span class="days-breakdown-count numeric-lock" dir="ltr">${item.days} ${item.days === 1 ? 'Day' : 'Days'}</span>
-        </div>
-      `).join('');
-    }
-  }
-
-  closeDaysBreakdownModal() {
-    if (this.dom.daysModalBackdrop) this.dom.daysModalBackdrop.hidden = true;
-    if (this.dom.daysBreakdownModal) this.dom.daysBreakdownModal.hidden = true;
-  }
-
-  openEventModal(item) {
-    if (!item || !this.#tripConfig) return;
-    this.#activeEventModalItem = item;
-    if (this.dom.eventModalBackdrop) this.dom.eventModalBackdrop.hidden = false;
-    if (this.dom.eventModal) this.dom.eventModal.hidden = false;
-    this.updateEventModalCountdown();
-  }
-
-  closeEventModal() {
-    this.#activeEventModalItem = null;
-    if (this.dom.eventModalBackdrop) this.dom.eventModalBackdrop.hidden = true;
-    if (this.dom.eventModal) this.dom.eventModal.hidden = true;
-  }
-
-  updateEventModalCountdown() {
-    if (!this.#activeEventModalItem || !this.#tripConfig) return;
-
-    const item = this.#activeEventModalItem;
-    const nowMs = this.latestBoardState?.nowMs ?? Date.now();
-    const isChapter = isReunionChapter(item);
-
-    let emoji = '';
-    let title = '';
-    let datePillText = '';
-    let locationText = '';
-    let targetStartMs = 0;
-    let targetEndMs = 0;
-    let subtext = '';
-
-    const personMeta = this.latestBoardState
-      ? resolveMilestonePersonMeta(item.person || 'both', this.latestBoardState)
-      : { icon: '💕', label: 'Together' };
-
-    if (isChapter) {
-      emoji = item.emoji || '🌺';
-      title = item.title;
-      datePillText = `${formatDisplayDate(item.startDate)} – ${formatDisplayDate(item.endDate)}`;
-
-      const firstLeg = item.legs?.[0];
-      const startCountry = firstLeg ? getCountryInfo(firstLeg.countryCode) : getCountryInfo(this.#tripConfig.homeCountryCode || 'US');
-      const lastLeg = item.legs?.[item.legs.length - 1];
-      const endCountry = lastLeg ? getCountryInfo(lastLeg.countryCode) : startCountry;
-
-      targetStartMs = getStartOfDayInTimeZoneMs(item.startDate, startCountry.timeZone);
-      targetEndMs = getEndOfDayInTimeZoneMs(item.endDate, endCountry.timeZone);
-
-      const countryNames = item.legs?.map((l) => {
-        const c = getCountryInfo(l.countryCode);
-        return `${c.flag} ${l.label || c.name}`;
-      }).join(' • ') || `${startCountry.flag} ${startCountry.name}`;
-
-      locationText = countryNames;
-      subtext = item.description || '';
-    } else {
-      emoji = item.emoji || '✨';
-      title = item.title;
-      datePillText = formatDisplayDate(item.date);
-
-      const countryInfo = item.countryCode ? getCountryInfo(item.countryCode) : getCountryInfo(this.#tripConfig.homeCountryCode || 'US');
-      targetStartMs = getStartOfDayInTimeZoneMs(item.date, countryInfo.timeZone);
-      targetEndMs = getEndOfDayInTimeZoneMs(item.date, countryInfo.timeZone);
-
-      locationText = `${countryInfo.flag} ${countryInfo.name}`;
-      subtext = item.details || '';
-    }
-
-    if (this.dom.eventModalBadge) this.dom.eventModalBadge.textContent = emoji;
-    if (this.dom.eventModalTitle) this.dom.eventModalTitle.textContent = title;
-    if (this.dom.eventModalDatePill) {
-      this.dom.eventModalDatePill.replaceChildren(createPhotoDateElement(datePillText, { isCompact: true }));
-    }
-    if (this.dom.eventModalTravelTag) {
-      this.dom.eventModalTravelTag.textContent = `${personMeta.icon} ${personMeta.label}`;
-      this.dom.eventModalTravelTag.hidden = false;
-    }
-    if (this.dom.eventModalLocation) this.dom.eventModalLocation.textContent = locationText;
-    if (this.dom.eventModalSubtext) {
-      this.dom.eventModalSubtext.textContent = '';
-      this.dom.eventModalSubtext.hidden = true;
-    }
-
-    if (nowMs < targetStartMs) {
-      const remaining = decomposeRemainingMs(targetStartMs - nowMs);
-      if (this.dom.eventCdDays) this.dom.eventCdDays.textContent = String(remaining.days).padStart(2, '0');
-      if (this.dom.eventCdHours) this.dom.eventCdHours.textContent = String(remaining.hours).padStart(2, '0');
-      if (this.dom.eventCdMinutes) this.dom.eventCdMinutes.textContent = String(remaining.minutes).padStart(2, '0');
-      if (this.dom.eventCdSeconds) this.dom.eventCdSeconds.textContent = String(remaining.seconds).padStart(2, '0');
-
-      if (this.dom.eventModalStatusPill) {
-        this.dom.eventModalStatusPill.className = 'event-modal-status-pill';
-        this.dom.eventModalStatusPill.textContent = remaining.days === 0
-          ? 'Starts Today'
-          : remaining.days === 1
-            ? 'Starts Tomorrow'
-            : `${remaining.days} Days Away`;
-      }
-    } else if (nowMs <= targetEndMs) {
-      const remaining = decomposeRemainingMs(targetEndMs - nowMs);
-      if (this.dom.eventCdDays) this.dom.eventCdDays.textContent = String(remaining.days).padStart(2, '0');
-      if (this.dom.eventCdHours) this.dom.eventCdHours.textContent = String(remaining.hours).padStart(2, '0');
-      if (this.dom.eventCdMinutes) this.dom.eventCdMinutes.textContent = String(remaining.minutes).padStart(2, '0');
-      if (this.dom.eventCdSeconds) this.dom.eventCdSeconds.textContent = String(remaining.seconds).padStart(2, '0');
-
-      if (this.dom.eventModalStatusPill) {
-        this.dom.eventModalStatusPill.className = 'event-modal-status-pill is-active';
-        this.dom.eventModalStatusPill.textContent = isChapter ? 'Active Chapter 💕' : 'Happening Today 🎉';
-      }
-    } else {
-      if (this.dom.eventCdDays) this.dom.eventCdDays.textContent = '00';
-      if (this.dom.eventCdHours) this.dom.eventCdHours.textContent = '00';
-      if (this.dom.eventCdMinutes) this.dom.eventCdMinutes.textContent = '00';
-      if (this.dom.eventCdSeconds) this.dom.eventCdSeconds.textContent = '00';
-
-      if (this.dom.eventModalStatusPill) {
-        this.dom.eventModalStatusPill.className = 'event-modal-status-pill';
-        this.dom.eventModalStatusPill.textContent = 'Completed Event';
-      }
-    }
-  }
-
-  /**
-   * Deletes or hides a timeline milestone or reunion chapter and syncs live state.
-   * @param {any} item
-   */
-  async deleteTimelineItem(item) {
-    if (!item?.id || !this.#tripConfig) return;
-    const id = item.id;
-    const isChapter = isReunionChapter(item) || item.isChapter;
-
-    if (isChapter) {
-      const customIdx = (this.liveState.customReunions || []).findIndex((r) => r.id === id);
-      if (customIdx >= 0) {
-        const updated = [...this.liveState.customReunions];
-        updated.splice(customIdx, 1);
-        this.liveState = { ...this.liveState, customReunions: updated };
-      } else {
-        this.liveState = {
-          ...this.liveState,
-          chapterOverrides: {
-            ...(this.liveState.chapterOverrides || {}),
-            [id]: {
-              ...(this.liveState.chapterOverrides?.[id] || {}),
-              hidden: true
-            }
-          }
-        };
-      }
-    } else {
-      const customIdx = (this.liveState.customMilestones || []).findIndex((m) => m.id === id);
-      if (customIdx >= 0) {
-        const updated = [...this.liveState.customMilestones];
-        updated.splice(customIdx, 1);
-        this.liveState = { ...this.liveState, customMilestones: updated };
-      } else {
-        this.liveState = {
-          ...this.liveState,
-          milestoneOverrides: {
-            ...(this.liveState.milestoneOverrides || {}),
-            [id]: {
-              ...(this.liveState.milestoneOverrides?.[id] || {}),
-              hidden: true
-            }
-          }
-        };
-      }
-    }
-
-    this.tick(true);
-    this.updateSyncBadge('pending', 'Saving…');
-    const result = await saveLiveState(
-      this.liveState,
-      this.#githubToken,
-      this.githubRepo,
-      this.#vaultCryptoKey
-    );
-    this.updateSyncBadge(result.syncedRemotely ? 'synced' : 'pending', 'Successfully updated');
-  }
-
-  updateProfileSelectorUI() {
-    this.dom.segBtnPrimary?.classList.toggle('is-active', this.activeProfile === 'primary');
-    this.dom.segBtnSecondary?.classList.toggle('is-active', this.activeProfile === 'secondary');
-  }
-
-  getEffectiveNowMs() {
-    return Date.now();
-  }
-
-  openEditSheet() {
-    if (!this.#tripConfig) return;
-    this.syncEditFormWithState();
-    this.dom.editSheetBackdrop?.classList.add('is-open');
-    this.dom.editBottomSheet?.classList.add('is-open');
-  }
-
-  closeEditSheet() {
-    this.dom.editSheetBackdrop?.classList.remove('is-open');
-    this.dom.editBottomSheet?.classList.remove('is-open');
-    if (this.dom.editBottomSheet) {
-      this.dom.editBottomSheet.style.transform = '';
-      this.dom.editBottomSheet.style.transition = '';
-    }
-  }
-
-  syncEditFormWithState() {
-    if (!this.#tripConfig) return;
-    const state = evaluateBoardState(this.#tripConfig, this.liveState, this.getEffectiveNowMs());
-    const partnerStatus = this.activeProfile === 'secondary'
-      ? state.dualStatus.secondary
-      : state.dualStatus.primary;
-
-    if (this.dom.editCurrentCountryLabel) {
-      this.dom.editCurrentCountryLabel.textContent = `${partnerStatus.displayName}'s Current Country`;
-    }
-    if (this.dom.editCurrentCountry) {
-      this.dom.editCurrentCountry.value = partnerStatus.countryCode;
-    }
-    if (this.dom.editCurrentNote) {
-      this.dom.editCurrentNote.value = partnerStatus.cityNote || '';
-    }
-  }
-
-  updateSyncBadge(stateKey, text) {
-    if (!this.dom.syncStatusPill) return;
-    this.dom.syncStatusPill.dataset.syncState = stateKey;
-    this.dom.syncStatusPill.textContent = text;
-  }
-
-  /**
-   * Evaluates board state at current/preview timestamp and updates DOM.
-   * No-ops strictly if the vault is locked (`this.#tripConfig === null`).
-   * @param {boolean} forceTimelineRender
-   */
   tick(forceTimelineRender = false) {
     if (!this.#tripConfig) return;
 
-    const nowMs = this.getEffectiveNowMs();
-    const state = evaluateBoardState(this.#tripConfig, this.liveState, nowMs);
-    this.latestBoardState = state;
+    const currentEpochMs = this.getEffectiveNowMs();
+    const evaluatedBoardState = evaluateBoardState(this.#tripConfig, this.liveState, currentEpochMs);
+    this.latestBoardState = evaluatedBoardState;
 
     // 1. Relationship Duration Top Pill
-    const rel = state.relationshipDuration;
+    const relationshipMeta = evaluatedBoardState.relationshipDuration;
     if (this.dom.relationshipDaysPrimary) {
-      this.dom.relationshipDaysPrimary.textContent = `${rel.totalDays} Days Together`;
+      this.dom.relationshipDaysPrimary.textContent = `${relationshipMeta.totalDays} Days Together`;
     }
     if (this.dom.relationshipDaysBreakdown) {
-      this.dom.relationshipDaysBreakdown.textContent = `${rel.months} Months, ${rel.daysRemainder} Days`;
+      this.dom.relationshipDaysBreakdown.textContent = `${relationshipMeta.months} Months, ${relationshipMeta.daysRemainder} Days`;
     }
 
     // 2. Phase Banner Pill
     if (this.dom.phaseBannerPill) {
-      this.dom.phaseBannerPill.textContent = state.phaseBannerText;
+      this.dom.phaseBannerPill.textContent = evaluatedBoardState.phaseBannerText;
     }
 
     // 3. Primary Countdown vs Together Celebration View
-    if (state.phase === 'TOGETHER' && state.activeReunion) {
+    if (evaluatedBoardState.phase === 'TOGETHER' && evaluatedBoardState.activeReunion) {
       if (this.dom.countdownApartView) this.dom.countdownApartView.hidden = true;
       if (this.dom.countdownTogetherView) this.dom.countdownTogetherView.hidden = false;
 
-      const ar = state.activeReunion;
-      const legCountry = getCountryInfo(ar.activeLeg.countryCode);
-      const legDisplayName = ar.activeLeg.label || legCountry.name;
+      const activeReunionMeta = evaluatedBoardState.activeReunion;
+      const legCountry = getCountryInfo(activeReunionMeta.activeLeg.countryCode);
+      const legDisplayName = activeReunionMeta.activeLeg.label || legCountry.name;
 
       if (this.dom.togetherLegBadge) {
-        const legTag = ar.totalLegs > 1
-          ? `Leg ${ar.legIndex + 1} of ${ar.totalLegs} • ${legCountry.flag} ${legDisplayName}`
+        const legTag = activeReunionMeta.totalLegs > 1
+          ? `Leg ${activeReunionMeta.legIndex + 1} of ${activeReunionMeta.totalLegs} • ${legCountry.flag} ${legDisplayName}`
           : `${legCountry.flag} ${legDisplayName}`;
-        this.dom.togetherLegBadge.textContent = `${legTag} • Day ${ar.dayOfReunion} of ${ar.totalReunionDays}`;
+        this.dom.togetherLegBadge.textContent = `${legTag} • Day ${activeReunionMeta.dayOfReunion} of ${activeReunionMeta.totalReunionDays}`;
       }
 
       if (this.dom.togetherHeadline) {
-        this.dom.togetherHeadline.textContent = `${ar.reunion.emoji} Together in ${legDisplayName}!`;
+        this.dom.togetherHeadline.textContent = `${activeReunionMeta.reunion.emoji} Together in ${legDisplayName}!`;
       }
 
       if (this.dom.togetherSubtext) {
-        if (ar.nextLeg) {
-          const nextCountry = getCountryInfo(ar.nextLeg.countryCode);
-          const nextLegDisplayName = ar.nextLeg.label || nextCountry.name;
-          this.dom.togetherSubtext.textContent = `Next leg: ${nextCountry.flag} ${nextLegDisplayName} in ${ar.daysUntilNextLeg} day${ar.daysUntilNextLeg === 1 ? '' : 's'} (${formatShortDisplayDate(ar.nextLeg.startDate)})`;
+        if (activeReunionMeta.nextLeg) {
+          const nextCountry = getCountryInfo(activeReunionMeta.nextLeg.countryCode);
+          const nextLegDisplayName = activeReunionMeta.nextLeg.label || nextCountry.name;
+          this.dom.togetherSubtext.textContent = `Next leg: ${nextCountry.flag} ${nextLegDisplayName} in ${activeReunionMeta.daysUntilNextLeg} day${activeReunionMeta.daysUntilNextLeg === 1 ? '' : 's'} (${formatShortDisplayDate(activeReunionMeta.nextLeg.startDate)})`;
         } else {
-          this.dom.togetherSubtext.textContent = ar.activeLeg.notes || ar.reunion.description;
+          this.dom.togetherSubtext.textContent = activeReunionMeta.activeLeg.notes || activeReunionMeta.reunion.description;
         }
       }
 
-      const progressPct = Math.min(100, Math.max(4, Math.round((ar.dayOfReunion / ar.totalReunionDays) * 100)));
+      const celebrationProgressPct = Math.min(100, Math.max(4, Math.round((activeReunionMeta.dayOfReunion / activeReunionMeta.totalReunionDays) * 100)));
       if (this.dom.togetherProgressDay) {
-        this.dom.togetherProgressDay.textContent = `Day ${ar.dayOfReunion} / ${ar.totalReunionDays}`;
+        this.dom.togetherProgressDay.textContent = `Day ${activeReunionMeta.dayOfReunion} / ${activeReunionMeta.totalReunionDays}`;
       }
       if (this.dom.togetherProgressFill) {
-        this.dom.togetherProgressFill.style.width = `${progressPct}%`;
+        this.dom.togetherProgressFill.style.width = `${celebrationProgressPct}%`;
       }
-    } else if (state.primaryCountdown) {
+    } else if (evaluatedBoardState.primaryCountdown) {
       if (this.dom.countdownApartView) this.dom.countdownApartView.hidden = false;
       if (this.dom.countdownTogetherView) this.dom.countdownTogetherView.hidden = true;
 
-      const cd = state.primaryCountdown;
+      const countdownMeta = evaluatedBoardState.primaryCountdown;
       if (this.dom.countdownTargetLabel) {
-        this.dom.countdownTargetLabel.textContent = state.phase === 'PRE_TRIP'
+        this.dom.countdownTargetLabel.textContent = evaluatedBoardState.phase === 'PRE_TRIP'
           ? 'Countdown to Reunion #1'
           : 'Countdown to Next Reunion';
       }
       if (this.dom.countdownTargetTitle) {
-        this.dom.countdownTargetTitle.textContent = `${cd.targetEmoji} ${cd.targetTitle}`;
+        this.dom.countdownTargetTitle.textContent = `${countdownMeta.targetEmoji} ${countdownMeta.targetTitle}`;
       }
       if (this.dom.countdownTargetDate) {
-        this.dom.countdownTargetDate.replaceChildren(createPhotoDateElement(cd.targetDate, { isCompact: true }));
+        this.dom.countdownTargetDate.replaceChildren(createPhotoDateElement(countdownMeta.targetDate, { isCompact: true }));
       }
 
-      if (this.dom.cdDays) this.dom.cdDays.textContent = String(cd.days).padStart(2, '0');
-      if (this.dom.cdHours) this.dom.cdHours.textContent = String(cd.hours).padStart(2, '0');
-      if (this.dom.cdMinutes) this.dom.cdMinutes.textContent = String(cd.minutes).padStart(2, '0');
-      if (this.dom.cdSeconds) this.dom.cdSeconds.textContent = String(cd.seconds).padStart(2, '0');
+      if (this.dom.cdDays) this.dom.cdDays.textContent = String(countdownMeta.days).padStart(2, '0');
+      if (this.dom.cdHours) this.dom.cdHours.textContent = String(countdownMeta.hours).padStart(2, '0');
+      if (this.dom.cdMinutes) this.dom.cdMinutes.textContent = String(countdownMeta.minutes).padStart(2, '0');
+      if (this.dom.cdSeconds) this.dom.cdSeconds.textContent = String(countdownMeta.seconds).padStart(2, '0');
 
-      if (state.phase === 'APART' && cd.separationTotalDays) {
+      if (evaluatedBoardState.phase === 'APART' && countdownMeta.separationTotalDays) {
         if (this.dom.separationProgressContainer) this.dom.separationProgressContainer.hidden = false;
-        const pct = Math.round(cd.separationProgressPct);
-        if (this.dom.separationProgressPct) this.dom.separationProgressPct.textContent = `${pct}%`;
-        if (this.dom.separationProgressFill) this.dom.separationProgressFill.style.width = `${pct}%`;
+        const progressPercent = Math.round(countdownMeta.separationProgressPct);
+        if (this.dom.separationProgressPct) this.dom.separationProgressPct.textContent = `${progressPercent}%`;
+        if (this.dom.separationProgressFill) this.dom.separationProgressFill.style.width = `${progressPercent}%`;
       } else {
         if (this.dom.separationProgressContainer) this.dom.separationProgressContainer.hidden = true;
       }
     }
 
-    // 4. Secondary Sooner Milestone Sub-Banner (diffed and built with safe textContent)
+    // 4. Secondary Sooner Milestone Sub-Banner
     if (this.dom.subMilestoneBanner) {
-      if (state.soonerMilestone) {
-        const ms = state.soonerMilestone;
-        const soonerSig = `${ms.id}:${state.soonerMilestoneDaysAway}:${ms.title}:${ms.date}`;
-        if (forceTimelineRender || soonerSig !== this.lastSoonerMilestoneSignature) {
-          this.lastSoonerMilestoneSignature = soonerSig;
-          const daysLabel = state.soonerMilestoneDaysAway === 0
+      if (evaluatedBoardState.soonerMilestone) {
+        const soonerEntry = evaluatedBoardState.soonerMilestone;
+        const soonerSignature = `${soonerEntry.id}:${evaluatedBoardState.soonerMilestoneDaysAway}:${soonerEntry.title}:${soonerEntry.date}`;
+        if (forceTimelineRender || soonerSignature !== this.lastSoonerMilestoneSignature) {
+          this.lastSoonerMilestoneSignature = soonerSignature;
+          const daysAwayLabel = evaluatedBoardState.soonerMilestoneDaysAway === 0
             ? 'Today!'
-            : state.soonerMilestoneDaysAway === 1
+            : evaluatedBoardState.soonerMilestoneDaysAway === 1
               ? 'Tomorrow'
-              : `In ${state.soonerMilestoneDaysAway} days`;
+              : `In ${evaluatedBoardState.soonerMilestoneDaysAway} days`;
 
           this.dom.subMilestoneBanner.hidden = false;
           this.dom.subMilestoneBanner.textContent = '';
 
-          const emojiSpan = document.createElement('span');
-          emojiSpan.textContent = ms.emoji;
+          const emojiBadge = document.createElement('span');
+          emojiBadge.textContent = soonerEntry.emoji;
 
-          const textWrapper = document.createElement('span');
-          const strongDate = document.createElement('strong');
-          strongDate.className = 'numeric-lock';
-          strongDate.setAttribute('dir', 'ltr');
-          strongDate.textContent = `${daysLabel} (${formatShortDisplayDate(ms.date)})`;
+          const labelWrapper = document.createElement('span');
+          const dateElement = document.createElement('strong');
+          dateElement.className = 'numeric-lock';
+          dateElement.setAttribute('dir', 'ltr');
+          dateElement.textContent = `${daysAwayLabel} (${formatShortDisplayDate(soonerEntry.date)})`;
 
-          const titleSpan = document.createElement('span');
-          titleSpan.setAttribute('dir', 'auto');
-          titleSpan.textContent = ms.title;
+          const titleElement = document.createElement('span');
+          titleElement.setAttribute('dir', 'auto');
+          titleElement.textContent = soonerEntry.title;
 
-          textWrapper.append(strongDate, document.createTextNode(': '), titleSpan);
-          this.dom.subMilestoneBanner.append(emojiSpan, textWrapper);
+          labelWrapper.append(dateElement, document.createTextNode(': '), titleElement);
+          this.dom.subMilestoneBanner.append(emojiBadge, labelWrapper);
         }
       } else {
         this.lastSoonerMilestoneSignature = 'none';
@@ -1735,8 +671,8 @@ export class CountdownBoardApp {
       }
     }
 
-    // 5. Dual Status & Time-Zone Bridge
-    const { primary, secondary, isSameTimeZone, bridgeLabel } = state.dualStatus;
+    // 5. Dual Status & Timezone Bridge
+    const { primary, secondary, isSameTimeZone, bridgeLabel } = evaluatedBoardState.dualStatus;
     if (this.dom.autoSyncIndicator) {
       this.dom.autoSyncIndicator.hidden = !(primary.isAutoSyncedToReunion && secondary.isAutoSyncedToReunion);
     }
@@ -1760,16 +696,16 @@ export class CountdownBoardApp {
       this.dom.tzBridgePill.classList.toggle('is-same-tz', isSameTimeZone);
     }
 
-    // 6. Timeline (re-render only when partition or active state changes, or when forced)
-    const timelineSig = `${state.phase}:${state.activeReunion?.activeLeg.id ?? 'none'}:${state.timeline.pastItems.length}:${state.timeline.upcomingItems.length}:${state.timeline.plannedTripDaysTogether}:${state.timeline.completedTripDaysTogether}`;
-    if (forceTimelineRender || timelineSig !== this.lastTimelineSignature) {
-      this.lastTimelineSignature = timelineSig;
-      this.timelineRenderer.render(state);
+    // 6. Timeline Renderer
+    const timelineSignature = `${evaluatedBoardState.phase}:${evaluatedBoardState.activeReunion?.activeLeg.id ?? 'none'}:${evaluatedBoardState.timeline.pastItems.length}:${evaluatedBoardState.timeline.upcomingItems.length}:${evaluatedBoardState.timeline.plannedTripDaysTogether}:${evaluatedBoardState.timeline.completedTripDaysTogether}`;
+    if (forceTimelineRender || timelineSignature !== this.lastTimelineSignature) {
+      this.lastTimelineSignature = timelineSignature;
+      this.timelineRenderer.render(evaluatedBoardState);
     }
 
-    // 7. Event Modal live countdown (ticks in real time when open)
-    if (this.#activeEventModalItem) {
-      this.updateEventModalCountdown();
+    // 7. Active Event Modal live countdown tick
+    if (this.eventCountdownModal.isOpen()) {
+      this.eventCountdownModal.updateCountdown(currentEpochMs, evaluatedBoardState);
     }
   }
 
@@ -1778,11 +714,22 @@ export class CountdownBoardApp {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
   }
+
+  destroy() {
+    this.stopTickLoop();
+    this.photoStack.destroy();
+    this.timelineRenderer.destroy?.();
+    this.daysBreakdownModal.destroy();
+    this.eventCountdownModal.destroy();
+    this.statusEditSheet.destroy();
+    this.timelineEditorSheet.destroy();
+    this.previewBanner.destroy();
+  }
 }
 
 if (typeof document !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
-    const app = new CountdownBoardApp();
-    void app.init();
+    const countdownBoardApp = new CountdownBoardApp();
+    void countdownBoardApp.init();
   });
 }

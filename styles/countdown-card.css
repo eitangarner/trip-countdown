@@ -1,0 +1,336 @@
+/**
+ * Trip Countdown & Timeline Board
+ * Visual System: Apple Music Lighter Matte Glass & Bidirectional (LTR/RTL) Layout
+ * Countdown Card Stylesheet: Time-Travel Preview Banner, Primary Countdown Card, Numerals & Celebration
+ */
+
+/* ==========================================================================
+   5. Time-Travel Preview Floating Banner (.preview-banner)
+   ========================================================================== */
+
+.preview-banner:not([hidden]) {
+  position: sticky;
+  inset-block-start: max(10px, env(safe-area-inset-top));
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 8px;
+  padding-inline: 14px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass-strong);
+  backdrop-filter: var(--blur-matte);
+  -webkit-backdrop-filter: var(--blur-matte);
+  border: 1.5px solid color-mix(in srgb, var(--ambient-accent) 45%, white);
+  box-shadow: var(--surface-shadow-elevated);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--ink-primary);
+  animation: banner-slide-in 260ms var(--transition-spring);
+}
+
+.preview-banner[hidden] {
+  display: none;
+}
+
+@keyframes banner-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.preview-banner-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-reset-btn {
+  flex-shrink: 0;
+  padding-block: 5px;
+  padding-inline: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--ambient-accent);
+  color: var(--ink-on-accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  transition: transform var(--transition-fast), filter var(--transition-fast);
+}
+
+.preview-reset-btn:active {
+  transform: scale(0.95);
+}
+
+/* ==========================================================================
+   7. Primary Countdown Card (.countdown-card)
+   ========================================================================== */
+
+.countdown-card {
+  width: 100%;
+  padding-block: 22px 20px;
+  padding-inline: 20px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-glass);
+  backdrop-filter: var(--blur-matte);
+  -webkit-backdrop-filter: var(--blur-matte);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--surface-shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.phase-banner-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-block: 5px;
+  padding-inline: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass-strong);
+  border: 1px solid var(--surface-border);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-secondary);
+}
+
+/* Apart / Pre-Trip Live D:H:M:S Countdown View Container */
+#countdown-apart-view:not([hidden]) {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+#countdown-apart-view[hidden] {
+  display: none;
+}
+
+.countdown-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.countdown-target-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+}
+
+.countdown-target-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink-primary);
+}
+
+.countdown-target-date {
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--ink-secondary);
+}
+
+/* 4-Block Tabular Countdown Grid (Days : Hours : Mins : Secs) */
+.countdown-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.countdown-unit,
+.countdown-cell {
+  position: relative;
+  overflow: hidden;
+  padding-block: 14px 10px;
+  padding-inline: 6px;
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 8px 24px -4px rgba(24, 28, 44, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.countdown-unit::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--ambient-accent),
+    color-mix(in srgb, var(--ambient-accent) 60%, white)
+  );
+}
+
+.countdown-value,
+.countdown-digits {
+  font-size: clamp(1.55rem, 6vw, 2.1rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--ink-primary);
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.countdown-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+}
+
+/* Separation Progress Bar */
+.separation-progress-container:not([hidden]) {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.separation-progress-container[hidden] {
+  display: none;
+}
+
+.separation-progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-secondary);
+}
+
+.separation-progress-bar {
+  width: 100%;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(20, 21, 26, 0.08);
+  overflow: hidden;
+  padding: 1px;
+  box-shadow: inset 0 1px 2px rgba(20, 21, 26, 0.08);
+}
+
+.separation-progress-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--ambient-primary), var(--ambient-accent), var(--track-together));
+  transition: width 600ms cubic-bezier(0.22, 1, 0.36, 1), background var(--transition-ambient);
+}
+
+/* Secondary Sooner Milestone Sub-Banner */
+.sub-milestone-banner:not([hidden]) {
+  width: 100%;
+  padding-block: 10px;
+  padding-inline: 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-glass-subtle);
+  border: 1px solid var(--surface-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  text-align: start;
+}
+
+.sub-milestone-banner[hidden] {
+  display: none;
+}
+
+.sub-milestone-banner strong {
+  color: var(--ink-primary);
+  font-weight: 600;
+}
+
+/* Together Celebration Mode inside Countdown Card */
+.together-celebration-card:not([hidden]) {
+  width: 100%;
+  padding-block: 18px;
+  padding-inline: 16px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ambient-primary) 38%, rgba(255, 255, 255, 0.85)),
+    color-mix(in srgb, var(--ambient-secondary) 38%, rgba(255, 255, 255, 0.85))
+  );
+  border: 1.5px solid rgba(255, 255, 255, 0.92);
+  box-shadow: var(--surface-shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.together-celebration-card[hidden] {
+  display: none;
+}
+
+.active-leg-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-block: 6px;
+  padding-inline: 14px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, var(--track-primary), var(--track-together));
+  color: var(--ink-on-accent);
+  font-size: 0.85rem;
+  font-weight: 700;
+  box-shadow: 0 6px 16px -4px rgba(217, 70, 239, 0.4);
+}
+
+.together-headline {
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink-primary);
+}
+
+.together-subtext {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--ink-secondary);
+}
+
+.leg-stepper-preview {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-block-start: 4px;
+}

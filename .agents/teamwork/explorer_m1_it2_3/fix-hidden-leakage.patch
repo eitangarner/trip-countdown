@@ -1,0 +1,23 @@
+--- a/styles/sheets-and-modals.css
++++ b/styles/sheets-and-modals.css
+@@ -269,13 +269,18 @@
+ }
+ 
+ /* Chapter Multi-Country Leg Editor */
+-#timeline-milestone-fields,
+-#timeline-chapter-fields {
++#timeline-milestone-fields:not([hidden]),
++#timeline-chapter-fields:not([hidden]) {
+   display: flex;
+   flex-direction: column;
+   gap: 12px;
+ }
+ 
++#timeline-milestone-fields[hidden],
++#timeline-chapter-fields[hidden] {
++  display: none;
++}
++
+ .chapter-header-fields-grid {
+   display: grid;
+   grid-template-columns: minmax(0, 1fr) 88px;

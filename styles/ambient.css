@@ -1,0 +1,89 @@
+/**
+ * Trip Countdown & Timeline Board
+ * Visual System: Apple Music Lighter Matte Glass & Bidirectional (LTR/RTL) Layout
+ * Ambient Stage Stylesheet: Viewport Ambient Dispersion, Organic Drift Blobs & Photo Aura
+ */
+
+/* ==========================================================================
+   2. Full-Viewport Ambient Dispersion Layer (.ambient-stage)
+   ========================================================================== */
+
+.ambient-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 16%, var(--ambient-primary) 0%, transparent 56%),
+    radial-gradient(circle at 82% 20%, var(--ambient-secondary) 0%, transparent 58%),
+    radial-gradient(circle at 22% 82%, var(--ambient-tertiary) 0%, transparent 60%),
+    radial-gradient(circle at 80% 84%, var(--ambient-quaternary) 0%, transparent 60%),
+    radial-gradient(circle at 50% 48%, color-mix(in srgb, var(--ambient-primary) 42%, var(--ambient-tertiary)) 0%, transparent 68%),
+    var(--bg-canvas);
+  transition: background var(--transition-ambient);
+}
+
+.ambient-blob {
+  position: absolute;
+  border-radius: var(--radius-pill);
+  filter: blur(80px) saturate(1.75);
+  opacity: 0.52;
+  pointer-events: none;
+  will-change: transform, background-color;
+  transition:
+    background-color var(--transition-ambient),
+    transform 6s ease-in-out;
+}
+
+.ambient-blob-primary {
+  width: min(85vw, 480px);
+  height: min(85vw, 480px);
+  inset-block-start: -8%;
+  inset-inline-start: -10%;
+  background-color: var(--ambient-primary);
+}
+
+.ambient-blob-secondary {
+  width: min(85vw, 460px);
+  height: min(85vw, 460px);
+  inset-block-start: 10%;
+  inset-inline-end: -12%;
+  background-color: var(--ambient-secondary);
+}
+
+.ambient-blob-tertiary {
+  width: min(82vw, 450px);
+  height: min(82vw, 450px);
+  inset-block-end: -10%;
+  inset-inline-start: -8%;
+  background-color: var(--ambient-tertiary);
+}
+
+.ambient-blob-quaternary {
+  width: min(82vw, 440px);
+  height: min(82vw, 440px);
+  inset-block-end: -8%;
+  inset-inline-end: -10%;
+  background-color: var(--ambient-quaternary);
+}
+
+.ambient-aura,
+.ambient-photo-aura,
+.ambient-backdrop-img,
+.ambient-stage canvas,
+.ambient-stage img {
+  position: absolute;
+  inset-block-start: -15%;
+  inset-inline-start: -15%;
+  width: 130%;
+  height: 130%;
+  object-fit: cover;
+  filter: blur(90px) saturate(1.85) brightness(1.12);
+  opacity: 0.44;
+  transform: translate3d(0, 0, 0) scale(1.06);
+  will-change: transform, opacity;
+  mask-image: radial-gradient(ellipse at 50% 45%, rgba(0, 0, 0, 0.96) 22%, rgba(0, 0, 0, 0.52) 72%, rgba(0, 0, 0, 0) 100%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 45%, rgba(0, 0, 0, 0.96) 22%, rgba(0, 0, 0, 0.52) 72%, rgba(0, 0, 0, 0) 100%);
+  transition: opacity var(--transition-ambient), transform var(--transition-ambient);
+}

@@ -1,0 +1,36 @@
+/**
+ * Trip Countdown & Timeline Board
+ * Visual System: Apple Music Lighter Matte Glass & Bidirectional (LTR/RTL) Layout
+ * Responsive Stylesheet: Breakpoint Overrides (Tablet & Desktop >= 540px)
+ */
+
+/* ==========================================================================
+   13. Responsive Breakpoints (Tablet & Desktop >= 540px)
+   ========================================================================== */
+
+@media (min-width: 540px) {
+  .app-shell,
+  .board-container,
+  main {
+    padding-inline: 24px;
+    gap: 24px;
+  }
+
+  .photo-stack {
+    max-width: 340px;
+  }
+
+  .countdown-card {
+    padding-block: 26px 24px;
+    padding-inline: 28px;
+  }
+
+  .person-status-card {
+    padding-block: 18px 16px;
+    padding-inline: 18px;
+  }
+
+  .status-edit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

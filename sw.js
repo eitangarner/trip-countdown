@@ -3,21 +3,39 @@
  * Caches core app shell assets on install and serves network-first with cache fallback for vault.json & live-state.json.
  */
 
-const CACHE_NAME = 'trip-countdown-board-v4';
+const CACHE_NAME = 'trip-countdown-board-v5';
 
 const APP_SHELL_ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './styles/main.css',
+  './styles/base.css',
+  './styles/ambient.css',
+  './styles/gate.css',
+  './styles/photo-stack.css',
+  './styles/countdown-card.css',
+  './styles/status-bar.css',
+  './styles/timeline.css',
+  './styles/sheets-and-modals.css',
+  './styles/responsive.css',
   './js/config.js',
+  './js/date-utils.js',
+  './js/anniversaries.js',
+  './js/countdown-engine.js',
+  './js/photo-palette.js',
+  './js/photo-badge.js',
+  './js/photo-stack.js',
+  './js/ui-gestures.js',
+  './js/ui-modals.js',
+  './js/ui-status-sheet.js',
+  './js/ui-editor-sheet.js',
+  './js/ui-preview-banner.js',
+  './js/app.js',
+  './js/timeline-renderer.js',
   './js/storage-vault.js',
   './js/crypto-vault.js',
-  './js/countdown-engine.js',
-  './js/photo-stack.js',
-  './js/timeline-renderer.js',
-  './js/github-sync.js',
-  './js/app.js'
+  './js/github-sync.js'
 ];
 
 self.addEventListener('install', (event) => {

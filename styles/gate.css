@@ -1,0 +1,201 @@
+/**
+ * Trip Countdown & Timeline Board
+ * Visual System: Apple Music Lighter Matte Glass & Bidirectional (LTR/RTL) Layout
+ * Gate Stylesheet: Cryptographic Unlock Overlay, Card, Form Controls, and Shared Buttons
+ */
+
+/* ==========================================================================
+   4. Password Gate Overlay (.vault-lock-overlay & .vault-card)
+   ========================================================================== */
+
+.vault-lock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 20px;
+  padding-block: 24px;
+  background: rgba(244, 244, 248, 0.52);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  transition: opacity 360ms ease, visibility 360ms ease;
+}
+
+.vault-lock-overlay.is-unlocked,
+.vault-lock-overlay.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.vault-card {
+  width: 100%;
+  max-width: 390px;
+  padding-block: 32px 28px;
+  padding-inline: 24px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-glass-strong);
+  backdrop-filter: var(--blur-matte);
+  -webkit-backdrop-filter: var(--blur-matte);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--surface-shadow-elevated);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.vault-card.is-error,
+.vault-card.shake {
+  animation: vault-shake 440ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes vault-shake {
+  10%, 90% { transform: translate3d(-3px, 0, 0); }
+  20%, 80% { transform: translate3d(5px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-7px, 0, 0); }
+  40%, 60% { transform: translate3d(7px, 0, 0); }
+}
+
+.vault-icon-badge {
+  width: 60px;
+  height: 60px;
+  border-radius: 20px;
+  display: grid;
+  place-items: center;
+  font-size: 1.75rem;
+  background: linear-gradient(135deg, var(--ambient-primary), var(--ambient-secondary));
+  box-shadow: 0 8px 20px -4px rgba(232, 111, 154, 0.35),
+              inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.vault-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink-primary);
+}
+
+.vault-subtitle {
+  font-size: 0.92rem;
+  color: var(--ink-secondary);
+  max-width: 30ch;
+}
+
+.vault-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-block-start: 4px;
+}
+
+.vault-password-input,
+.vault-input {
+  width: 100%;
+  padding-block: 14px;
+  padding-inline: 16px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.86);
+  border: 1.5px solid var(--surface-border-subtle);
+  font-size: 1rem;
+  color: var(--ink-primary);
+  text-align: center;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.vault-password-input:focus,
+.vault-input:focus {
+  outline: none;
+  border-color: var(--ambient-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ambient-accent) 20%, transparent);
+}
+
+.vault-remember-pill,
+.vault-remember-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  align-self: center;
+  padding-block: 7px;
+  padding-inline: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-glass-subtle);
+  border: 1px solid var(--surface-border);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  cursor: pointer;
+}
+
+.vault-remember-pill input[type="checkbox"],
+.vault-remember-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ambient-accent);
+  cursor: pointer;
+}
+
+.vault-unlock-btn,
+.btn-primary {
+  width: 100%;
+  padding-block: 14px;
+  padding-inline: 20px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--ambient-accent), var(--track-primary));
+  color: var(--ink-on-accent);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  box-shadow: 0 8px 20px -4px color-mix(in srgb, var(--ambient-accent) 48%, transparent),
+              inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: transform var(--transition-fast), filter var(--transition-fast), opacity var(--transition-fast);
+}
+
+.vault-unlock-btn:active,
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.vault-unlock-btn:disabled,
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  width: 100%;
+  padding-block: 14px;
+  padding-inline: 20px;
+  border-radius: var(--radius-md);
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.btn-danger:active {
+  transform: scale(0.98);
+}
+
+.vault-error-msg {
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: #dc2626;
+  min-height: 1.2em;
+}
+
+.vault-error-msg:empty {
+  display: none;
+}

@@ -14,7 +14,29 @@ Zero-dependency static PWA (Vanilla HTML5, CSS3, ES2022 Modules) deployed direct
 
 ## Non-Negotiable Invariants
 
-### 1. Zero-Knowledge Client-Side Security
+### 1. The 5 AI Engineering Principles (Anti-Boilerplate Standards)
+1. **Contextual Discovery (Zero Vacuum Coding)**: Scan existing files before writing code. Reuse established utilities, formatters, and architectural seams. Never duplicate an existing helper or pattern.
+2. **Minimalist Implementation (Zero Speculative Generality / YAGNI)**: Implement the direct, simplest solution for the immediate requirement. No single-use factory functions, premature abstractions, or empty lifecycle hooks.
+3. **Boundary-Only Defensiveness (Zero Paranoid Boilerplate)**: Validate strictly at external system boundaries (network I/O, user input, storage). Avoid redundant internal `try/catch` blocks, empty fallback objects, or paranoid `null` checks on trusted internal data.
+4. **Self-Documenting Code (Zero Tutorial Voice & Redundant Comments)**: Let code structure and identifiers convey operation. Comments are reserved solely for non-obvious *why* (business rules, browser quirks, security constraints). Docstrings on simple internal helpers are prohibited.
+5. **Domain-Specific Precision (Zero Generic Identifiers)**: Ban generic names (`data`, `result`, `item`, `temp`, `obj`, `handleUpdate`). Every variable, parameter, class, and function must be tied directly to its business entity and state.
+
+### 2. Domain-Specific Code Standards
+
+#### JavaScript (ES2022 Native Modules)
+- **Zero-Bundler Native ESM**: All imports must specify the exact relative file path including `.js` extension (e.g., `import { ... } from './date-utils.js'`). No external npm packages or build transpilers.
+- **Pure State Engines**: Calculation engines (`countdown-engine.js`, `date-utils.js`, `anniversaries.js`) must be pure state machines accepting explicit timestamps (`nowMs`) and configurations, never calling `Date.now()` or referencing ambient DOM state.
+- **DOM Caching & Batching**: Query DOM elements once upon controller initialization; never call `document.querySelector` inside animation frames, tick loops, or repeated gesture events. Use `DocumentFragment` or cloning for dynamic list inserts.
+- **Memory & Lifecycle Hygiene**: Controllers attaching listeners to `window`, `document`, or timers must expose explicit `destroy()` or unbind mechanisms to prevent memory leaks.
+- **Fail Fast Internally**: Do not swallow internal runtime errors with catch-all fallbacks. If internal invariants fail, allow execution to fail visibly.
+
+#### CSS3 & UI Architecture
+- **CSS Logical Properties Exclusively**: Never use physical direction properties (`left`, `right`, `margin-left`, `margin-right`, `padding-left`, `padding-right`, `text-align: left`, etc.). Always use logical properties (`inset-inline-start`, `inset-inline-end`, `margin-inline`, `padding-inline`, `text-align: start`).
+- **State via Classes & CSS Variables**: Control visual states via semantic classes (`.is-active`, `.is-dragging`) or CSS custom properties (`--ambient-primary`). Never inject ad-hoc inline styles via JavaScript except when updating dynamic CSS variables or continuous drag transforms. Never use `!important`.
+- **Bidirectional Numeric Lock**: All elements displaying dates, countdown numerals, clocks, or timezone offsets must apply `dir="ltr"`, `unicode-bidi: isolate`, and `font-variant-numeric: tabular-nums` (`.numeric-lock`) to prevent bidirectional inversion.
+- **Matte-Glass Design Tokens**: All surface colors, border highlights, and blur backdrops must draw from `:root` CSS variables (`--glass-bg`, `--glass-border`, `--glass-shadow`, `--ambient-*`).
+
+### 3. Zero-Knowledge Client-Side Security
 - `index.html`, `manifest.json`, `styles/main.css`, and `js/*.js` must contain zero hardcoded personal names, dates, or trip destinations. `<main id="board-container">` remains `hidden` and unpopulated until `vault.json` is decrypted.
 - `githubToken` exists only inside encrypted `vault.json` and in a private volatile instance field (`#githubToken`) after unlock. When persisting to IndexedDB (`TripCountdownSecureStorage` / `vault_cache`), `record.payload.githubToken` must be stripped (`null`), using a non-extractable `CryptoKey` (`extractable: false`) to unwrap secrets in memory on reload.
 
