@@ -298,7 +298,7 @@ test('Mobile Tab Transitions & Counter Cleanup Integrity', () => {
   const appJs = fs.readFileSync(path.resolve('js/app.js'), 'utf8');
 
   // Verify fluid hardware-accelerated slide transitions
-  assert.ok(baseCss.includes('--slide-offset: 48px;'), 'Slide offset must be at least 48px for fluid mobile transitions');
+  assert.ok(baseCss.includes('--slide-offset: 64px;'), 'Slide offset must be at least 48px for fluid mobile transitions');
   assert.ok(baseCss.includes('translate3d('), 'Keyframe animations must use translate3d for GPU compositing');
   assert.ok(baseCss.includes('touch-action: pan-y pinch-zoom;'), 'Panels must declare touch-action for responsive gestures');
 
