@@ -8,6 +8,7 @@ import {
   decomposeRemainingMs,
   formatDisplayDate,
   getEndOfDayInTimeZoneMs,
+  getReunionDurationDays,
   getStartOfDayInTimeZoneMs
 } from './countdown-engine.js';
 import { createPhotoDateElement } from './photo-badge.js';
@@ -107,7 +108,7 @@ export class DaysBreakdownModal {
     const plannedDays = boardState.timeline?.plannedTripDaysTogether ?? 0;
 
     if (this.#dom.totalPill) {
-      this.#dom.totalPill.textContent = `${plannedDays} Days Total`;
+      this.#dom.totalPill.textContent = `${plannedDays} Days Together`;
     }
 
     if (this.#dom.list) {
@@ -387,7 +388,7 @@ export class EventCountdownModal {
           ? 'Starts Today'
           : remaining.days === 1
             ? 'Starts Tomorrow'
-            : `${remaining.days} Days Away`;
+            : (isChapter ? `${getReunionDurationDays(timelineEntry)} Days Together` : 'Upcoming Milestone');
       }
     } else if (nowMs <= targetEndMs) {
       const remaining = decomposeRemainingMs(targetEndMs - nowMs);

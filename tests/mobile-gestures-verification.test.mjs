@@ -291,3 +291,22 @@ test('Mobile Stylesheet Integrity: form inputs avoid iOS zoom and modals have ma
     '.reunion-meta-row must pair date range and duration pill'
   );
 });
+
+test('Mobile Tab Transitions & Counter Cleanup Integrity', () => {
+  const baseCss = fs.readFileSync(path.resolve('styles/base.css'), 'utf8');
+  const modalsJs = fs.readFileSync(path.resolve('js/ui-modals.js'), 'utf8');
+  const appJs = fs.readFileSync(path.resolve('js/app.js'), 'utf8');
+
+  // Verify fluid hardware-accelerated slide transitions
+  assert.ok(baseCss.includes('--slide-offset: 48px;'), 'Slide offset must be at least 48px for fluid mobile transitions');
+  assert.ok(baseCss.includes('translate3d('), 'Keyframe animations must use translate3d for GPU compositing');
+  assert.ok(baseCss.includes('touch-action: pan-y pinch-zoom;'), 'Panels must declare touch-action for responsive gestures');
+
+  // Verify zero "Days Away" or separation days in modal displays
+  assert.equal(modalsJs.includes('Days Away'), false, 'UI modals must not contain "Days Away" status text');
+  assert.ok(modalsJs.includes('${plannedDays} Days Together'), 'Days breakdown must strictly show Days Together');
+  assert.ok(modalsJs.includes('Days Together'), 'Modal status pill must retain Days Together for chapters');
+
+  // Verify sub-milestone banner omits "In X days"
+  assert.equal(appJs.includes('In ${evaluatedBoardState.soonerMilestoneDaysAway} days'), false, 'Sub-milestone banner must omit days away countdown string');
+});

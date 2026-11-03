@@ -465,12 +465,12 @@ export class CountdownBoardApp {
     });
 
     this.dom.navBtnCountdown?.addEventListener('click', () => {
+      window.scrollTo(0, 0);
       this.switchView('countdown');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     });
     this.dom.navBtnTimeline?.addEventListener('click', () => {
+      window.scrollTo(0, 0);
       this.switchView('timeline');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
     this.dom.addTimelineItemBtn?.addEventListener('click', () => {
@@ -503,14 +503,14 @@ export class CountdownBoardApp {
       containerElement: this.dom.boardContainer,
       onSwipeLeft: () => {
         if (this.activeView === 'countdown') {
+          window.scrollTo(0, 0);
           this.switchView('timeline');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       },
       onSwipeRight: () => {
         if (this.activeView === 'timeline') {
+          window.scrollTo(0, 0);
           this.switchView('countdown');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
         }
       },
       isSwipeEnabled: () => {
@@ -564,6 +564,7 @@ export class CountdownBoardApp {
   }
 
   switchView(viewName) {
+    if (viewName === this.activeView) return;
     const previousView = this.activeView;
     this.activeView = viewName;
     if (this.dom.bottomNav) {
@@ -673,13 +674,8 @@ export class CountdownBoardApp {
       if (this.dom.cdMinutes) this.dom.cdMinutes.textContent = String(countdownMeta.minutes).padStart(2, '0');
       if (this.dom.cdSeconds) this.dom.cdSeconds.textContent = String(countdownMeta.seconds).padStart(2, '0');
 
-      if (evaluatedBoardState.phase === 'APART' && countdownMeta.separationTotalDays) {
-        if (this.dom.separationProgressContainer) this.dom.separationProgressContainer.hidden = false;
-        const progressPercent = Math.round(countdownMeta.separationProgressPct);
-        if (this.dom.separationProgressPct) this.dom.separationProgressPct.textContent = `${progressPercent}%`;
-        if (this.dom.separationProgressFill) this.dom.separationProgressFill.style.width = `${progressPercent}%`;
-      } else {
-        if (this.dom.separationProgressContainer) this.dom.separationProgressContainer.hidden = true;
+      if (this.dom.separationProgressContainer) {
+        this.dom.separationProgressContainer.hidden = true;
       }
     }
 
@@ -687,14 +683,14 @@ export class CountdownBoardApp {
     if (this.dom.subMilestoneBanner) {
       if (evaluatedBoardState.soonerMilestone) {
         const soonerEntry = evaluatedBoardState.soonerMilestone;
-        const soonerSignature = `${soonerEntry.id}:${evaluatedBoardState.soonerMilestoneDaysAway}:${soonerEntry.title}:${soonerEntry.date}`;
+        const soonerSignature = `${soonerEntry.id}:${soonerEntry.title}:${soonerEntry.date}`;
         if (forceTimelineRender || soonerSignature !== this.lastSoonerMilestoneSignature) {
           this.lastSoonerMilestoneSignature = soonerSignature;
           const daysAwayLabel = evaluatedBoardState.soonerMilestoneDaysAway === 0
             ? 'Today!'
             : evaluatedBoardState.soonerMilestoneDaysAway === 1
               ? 'Tomorrow'
-              : `In ${evaluatedBoardState.soonerMilestoneDaysAway} days`;
+              : '';
 
           this.dom.subMilestoneBanner.hidden = false;
           this.dom.subMilestoneBanner.textContent = '';
@@ -706,7 +702,9 @@ export class CountdownBoardApp {
           const dateElement = document.createElement('strong');
           dateElement.className = 'numeric-lock';
           dateElement.setAttribute('dir', 'ltr');
-          dateElement.textContent = `${daysAwayLabel} (${formatShortDisplayDate(soonerEntry.date)})`;
+          dateElement.textContent = daysAwayLabel
+            ? `${daysAwayLabel} (${formatShortDisplayDate(soonerEntry.date)})`
+            : formatShortDisplayDate(soonerEntry.date);
 
           const titleElement = document.createElement('span');
           titleElement.setAttribute('dir', 'auto');
