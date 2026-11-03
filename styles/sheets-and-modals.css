@@ -242,7 +242,7 @@
 /* Form Controls */
 .status-edit-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -250,6 +250,7 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+  min-width: 0;
 }
 
 .form-label {
@@ -260,7 +261,11 @@
 
 .form-select,
 .form-input {
+  display: block;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding-block: 10px;
   padding-inline: 12px;
   border-radius: var(--radius-md);
@@ -268,6 +273,20 @@
   border: 1px solid var(--surface-border-subtle);
   font-size: 1rem;
   color: var(--ink-primary);
+}
+
+.form-input.numeric-lock {
+  display: block;
+}
+
+.form-input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.form-input[type="date"]::-webkit-date-and-time-value {
+  text-align: inherit;
+  min-height: 1.5em;
 }
 
 .form-select:focus,
@@ -339,6 +358,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
 }
 
 .chapter-leg-editor-card {
@@ -352,6 +372,7 @@
   border: 1px solid var(--surface-border);
   box-shadow: 0 2px 8px rgba(20, 21, 26, 0.04);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  min-width: 0;
 }
 
 .chapter-leg-editor-card.is-focused {
