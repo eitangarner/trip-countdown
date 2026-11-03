@@ -8,7 +8,7 @@ import { COUNTRY_CATALOG, PINNED_COUNTRY_CODES, getCountryInfo } from '../js/con
 import { deriveVaultCryptoKey } from '../js/crypto-vault.js';
 import { evaluateBoardState } from '../js/countdown-engine.js';
 import { FALLBACK_PHOTOS, PhotoStackController, clampHslForRole, createPhotoDateElement, extractLuminousPalette, rgbToHsl } from '../js/photo-stack.js';
-import { createMilestoneRowElement, isReunionChapter, resolveMilestonePersonMeta } from '../js/timeline-renderer.js';
+import { createMilestoneRowElement, isReunionChapter, resolveMilestonePersonMeta, TimelineRenderer } from '../js/timeline-renderer.js';
 import { loadLiveState, saveLiveState } from '../js/github-sync.js';
 import { buildDefaultTripConfig } from '../scripts/encrypt-vault.mjs';
 
@@ -374,6 +374,7 @@ test('Integration: resolveMilestonePersonMeta assigns person icons (🌸, 🌊, 
   // DOM Mock for createMilestoneRowElement
   const prevDoc = globalThis.document;
   function makeMockElement(tag) {
+    const classSet = new Set();
     return {
       tag,
       className: '',
@@ -383,6 +384,19 @@ test('Integration: resolveMilestonePersonMeta assigns person icons (🌸, 🌊, 
       attrs: {},
       dataset: {},
       listeners: {},
+      classList: {
+        add: (c) => classSet.add(c),
+        remove: (c) => classSet.delete(c),
+        toggle: (c, force) => {
+          if (force !== undefined) {
+            if (force) classSet.add(c); else classSet.delete(c);
+            return force;
+          }
+          if (classSet.has(c)) { classSet.delete(c); return false; }
+          classSet.add(c); return true;
+        },
+        contains: (c) => classSet.has(c)
+      },
       setAttribute(k, v) { this.attrs[k] = v; },
       getAttribute(k) { return this.attrs[k]; },
       appendChild(child) { this.children.push(child); },
@@ -579,4 +593,85 @@ test('Integration: index.html contains Timeline Header Add Button, Update Status
   assert.ok(html.includes('id="event-cd-seconds"'));
   assert.ok(html.includes('id="event-modal-edit-btn"'));
   assert.ok(html.includes('id="event-modal-date-pill"'));
+});
+
+test('Integration: TimelineRenderer renders both reunion chapters and milestones without errors', () => {
+  const config = buildDefaultTripConfig();
+  config.reunions = [
+    {
+      id: 'reunion-test',
+      title: 'Thailand Reunion',
+      emoji: '🌺',
+      startDate: '2026-12-31',
+      endDate: '2027-01-10',
+      description: 'Shared chapter',
+      legs: [
+        {
+          id: 'leg-1',
+          countryCode: 'TH',
+          startDate: '2026-12-31',
+          endDate: '2027-01-10',
+          notes: ''
+        }
+      ]
+    }
+  ];
+  const state = evaluateBoardState(config, null, 1761912000000);
+
+  const prevDoc = globalThis.document;
+  function makeMockElement(tag) {
+    const classSet = new Set();
+    return {
+      tag,
+      className: '',
+      textContent: '',
+      innerHTML: '',
+      children: [],
+      attrs: {},
+      dataset: {},
+      listeners: {},
+      classList: {
+        add: (c) => classSet.add(c),
+        remove: (c) => classSet.delete(c),
+        toggle: (c, force) => {
+          if (force !== undefined) {
+            if (force) classSet.add(c); else classSet.delete(c);
+            return force;
+          }
+          if (classSet.has(c)) { classSet.delete(c); return false; }
+          classSet.add(c); return true;
+        },
+        contains: (c) => classSet.has(c)
+      },
+      setAttribute(k, v) { this.attrs[k] = v; },
+      getAttribute(k) { return this.attrs[k]; },
+      appendChild(child) { this.children.push(child); },
+      addEventListener(type, fn) { this.listeners[type] = fn; }
+    };
+  }
+  globalThis.document = /** @type {any} */ ({ createElement: makeMockElement });
+
+  try {
+    const pastDrawerEl = makeMockElement('div');
+    const upcomingTrackEl = makeMockElement('div');
+    const pastToggleBtn = makeMockElement('button');
+    const statsPillEl = makeMockElement('button');
+
+    const renderer = new TimelineRenderer({
+      statsPillEl: /** @type {any} */ (statsPillEl),
+      pastToggleBtn: /** @type {any} */ (pastToggleBtn),
+      pastDrawerEl: /** @type {any} */ (pastDrawerEl),
+      upcomingTrackEl: /** @type {any} */ (upcomingTrackEl)
+    });
+
+    assert.doesNotThrow(() => {
+      renderer.render(state);
+    });
+
+    assert.ok(upcomingTrackEl.children.length > 0, 'Upcoming track must contain rendered nodes');
+    const reunionCard = upcomingTrackEl.children.find((c) => c.className?.includes('reunion-chapter-card'));
+    assert.ok(reunionCard, 'Must successfully render reunion chapter card without ReferenceError');
+  } finally {
+    globalThis.document = prevDoc;
+  }
 });

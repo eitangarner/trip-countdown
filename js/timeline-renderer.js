@@ -207,6 +207,9 @@ function createReunionCardElement(reunion, boardState, onEditItem = null, onDele
   titleEl.setAttribute('dir', 'auto');
   titleEl.textContent = reunion.title;
 
+  const dateRangeEl = createPhotoDateElement(`${formatDisplayDate(reunion.startDate)} – ${formatDisplayDate(reunion.endDate)}`, { isCompact: true });
+  dateRangeEl.classList.add('reunion-date-range');
+
   const totalDays = getReunionDurationDays(reunion);
   const durationPill = document.createElement('span');
   durationPill.className = 'reunion-duration-pill numeric-lock';
