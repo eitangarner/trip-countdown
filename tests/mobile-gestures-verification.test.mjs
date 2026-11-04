@@ -307,6 +307,7 @@ test('Mobile Tab Transitions & Counter Cleanup Integrity', () => {
   assert.ok(modalsJs.includes('${plannedDays} Days Together'), 'Days breakdown must strictly show Days Together');
   assert.ok(modalsJs.includes('Days Together'), 'Modal status pill must retain Days Together for chapters');
 
-  // Verify sub-milestone banner omits "In X days"
+  // Verify sub-milestone banner omits "In X days" and uses calendar date pill
   assert.equal(appJs.includes('In ${evaluatedBoardState.soonerMilestoneDaysAway} days'), false, 'Sub-milestone banner must omit days away countdown string');
+  assert.ok(appJs.includes('createPhotoDateElement(soonerEntry.date'), 'Sub-milestone banner must use date pill element');
 });

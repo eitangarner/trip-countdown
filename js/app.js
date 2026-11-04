@@ -641,7 +641,7 @@ export class CountdownBoardApp {
           const nextLegDisplayName = activeReunionMeta.nextLeg.label || nextCountry.name;
           this.dom.togetherSubtext.textContent = `Next leg: ${nextCountry.flag} ${nextLegDisplayName} in ${activeReunionMeta.daysUntilNextLeg} day${activeReunionMeta.daysUntilNextLeg === 1 ? '' : 's'} (${formatShortDisplayDate(activeReunionMeta.nextLeg.startDate)})`;
         } else {
-          this.dom.togetherSubtext.textContent = activeReunionMeta.activeLeg.notes || activeReunionMeta.reunion.description;
+          this.dom.togetherSubtext.textContent = activeReunionMeta.activeLeg.notes || activeReunionMeta.reunion.description || '';
         }
       }
 
@@ -698,20 +698,24 @@ export class CountdownBoardApp {
           const emojiBadge = document.createElement('span');
           emojiBadge.textContent = soonerEntry.emoji;
 
-          const labelWrapper = document.createElement('span');
-          const dateElement = document.createElement('strong');
-          dateElement.className = 'numeric-lock';
-          dateElement.setAttribute('dir', 'ltr');
-          dateElement.textContent = daysAwayLabel
-            ? `${daysAwayLabel} (${formatShortDisplayDate(soonerEntry.date)})`
-            : formatShortDisplayDate(soonerEntry.date);
+          const datePill = createPhotoDateElement(soonerEntry.date, { isCompact: true });
 
           const titleElement = document.createElement('span');
           titleElement.setAttribute('dir', 'auto');
           titleElement.textContent = soonerEntry.title;
 
-          labelWrapper.append(dateElement, document.createTextNode(': '), titleElement);
-          this.dom.subMilestoneBanner.append(emojiBadge, labelWrapper);
+          const bannerElements = [emojiBadge];
+          if (daysAwayLabel) {
+            const daysBadge = document.createElement('strong');
+            daysBadge.textContent = daysAwayLabel;
+            bannerElements.push(daysBadge);
+          }
+          if (datePill) {
+            bannerElements.push(datePill);
+          }
+          bannerElements.push(titleElement);
+
+          this.dom.subMilestoneBanner.append(...bannerElements);
         }
       } else {
         this.lastSoonerMilestoneSignature = 'none';
