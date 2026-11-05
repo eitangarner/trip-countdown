@@ -679,43 +679,53 @@ export class CountdownBoardApp {
       }
     }
 
-    // 4. Secondary Sooner Milestone Sub-Banner
+    // 4. Secondary Sooner Milestone Floating Block
     if (this.dom.subMilestoneBanner) {
       if (evaluatedBoardState.soonerMilestone) {
         const soonerEntry = evaluatedBoardState.soonerMilestone;
-        const soonerSignature = `${soonerEntry.id}:${soonerEntry.title}:${soonerEntry.date}`;
+        const soonerDaysAway = evaluatedBoardState.soonerMilestoneDaysAway;
+        const soonerSignature = `${soonerEntry.id}:${soonerDaysAway}:${soonerEntry.title}:${soonerEntry.date}`;
         if (forceTimelineRender || soonerSignature !== this.lastSoonerMilestoneSignature) {
           this.lastSoonerMilestoneSignature = soonerSignature;
-          const daysAwayLabel = evaluatedBoardState.soonerMilestoneDaysAway === 0
-            ? 'Today!'
-            : evaluatedBoardState.soonerMilestoneDaysAway === 1
-              ? 'Tomorrow'
-              : '';
+          const statusText = soonerDaysAway === 0
+            ? 'TODAY!'
+            : soonerDaysAway === 1
+              ? 'TOMORROW'
+              : `IN ${soonerDaysAway} DAYS`;
 
           this.dom.subMilestoneBanner.hidden = false;
           this.dom.subMilestoneBanner.textContent = '';
 
-          const emojiBadge = document.createElement('span');
-          emojiBadge.textContent = soonerEntry.emoji;
+          const statusLabel = document.createElement('span');
+          statusLabel.className = 'sub-milestone-status numeric-lock';
+          statusLabel.setAttribute('dir', 'ltr');
+          statusLabel.textContent = statusText;
+
+          const rowWrapper = document.createElement('div');
+          rowWrapper.className = 'sub-milestone-row';
 
           const datePill = createPhotoDateElement(soonerEntry.date, { isCompact: true });
-
-          const titleElement = document.createElement('span');
-          titleElement.setAttribute('dir', 'auto');
-          titleElement.textContent = soonerEntry.title;
-
-          const bannerElements = [emojiBadge];
-          if (daysAwayLabel) {
-            const daysBadge = document.createElement('strong');
-            daysBadge.textContent = daysAwayLabel;
-            bannerElements.push(daysBadge);
-          }
           if (datePill) {
-            bannerElements.push(datePill);
+            rowWrapper.appendChild(datePill);
           }
-          bannerElements.push(titleElement);
 
-          this.dom.subMilestoneBanner.append(...bannerElements);
+          const titleGroup = document.createElement('span');
+          titleGroup.className = 'sub-milestone-title';
+          titleGroup.setAttribute('dir', 'auto');
+
+          if (soonerEntry.emoji) {
+            const emojiSpan = document.createElement('span');
+            emojiSpan.textContent = soonerEntry.emoji;
+            titleGroup.appendChild(emojiSpan);
+          }
+
+          const titleText = document.createElement('span');
+          titleText.textContent = soonerEntry.title;
+          titleGroup.appendChild(titleText);
+
+          rowWrapper.appendChild(titleGroup);
+
+          this.dom.subMilestoneBanner.append(statusLabel, rowWrapper);
         }
       } else {
         this.lastSoonerMilestoneSignature = 'none';
